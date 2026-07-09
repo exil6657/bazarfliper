@@ -1,0 +1,64 @@
+{
+  "mayors": {
+    "Aatrox": {
+      "perks": [
+        {"name": "SLASHED Pricing", "categories": ["slayer"], "modifier": 1.2, "description": "Reduces slayer quest cost"},
+        {"name": "Pathfinder", "categories": ["slayer"], "modifier": 1.1, "description": "Grants more slayer xp"}
+      ]
+    },
+    "Cole": {
+      "perks": [
+        {"name": "Prospection", "categories": ["mining", "ore"], "modifier": 1.25, "description": "Boosts mining fortune"},
+        {"name": "Mining XP Buff", "categories": ["mining"], "modifier": 1.5, "description": "+1.5x mining xp"}
+      ]
+    },
+    "Diana": {
+      "perks": [
+        {"name": "Mythological Ritual", "categories": ["mythology", "pet"], "modifier": 1.3, "description": "Mythology event bonuses"}
+      ]
+    },
+    "Diaz": {
+      "perks": [
+        {"name": "Long Term Investment", "categories": ["coins"], "modifier": 1.1, "description": "Bank interest increase"},
+        {"name": "Volume Trading", "categories": ["auction"], "modifier": 1.2, "description": "More AH slots"}
+      ]
+    },
+    "Derpy": {
+      "perks": [
+        {"name": "TURBO MINIONS!!!", "categories": ["minion"], "modifier": 2.0, "description": "Minions work 2x faster"},
+        {"name": "AH CLOSED? - QUAD TAX", "categories": ["auction", "bazaar"], "modifier": 0.25, "description": "QUADRUPLES AH and Bazaar taxes - 4x normal. AH claim tax: 1%->4%, 2%->8%, 2.5%->10%. Bazaar tax 1.25%->5%. Source: Hypixel forums thread 5739552, NamuWiki, Coflnet guide. Critical for TaxCalculator.", "derpy_tax_multiplier": 4.0, "derpy_tax_applies_above": 1000000}
+      ]
+    },
+    "Finnegan": {
+      "perks": [
+        {"name": "Farming Simulator", "categories": ["farming", "crops"], "modifier": 1.25, "description": "Farming fortune"}
+      ]
+    },
+    "Foxy": {
+      "perks": [
+        {"name": "Sweet Benevolence", "categories": ["fishing", "sweets"], "modifier": 1.25, "description": "Fishing and spooky buffs"}
+      ]
+    },
+    "Marina": {
+      "perks": [
+        {"name": "Fishing XP Buff", "categories": ["fishing"], "modifier": 1.5, "description": "Fishing XP +50%"}
+      ]
+    },
+    "Paul": {
+      "perks": [
+        {"name": "Marauder", "categories": ["dungeon", "combat"], "modifier": 1.2, "description": "Dungeon bonuses"}
+      ]
+    },
+    "Jerry": {
+      "perks": [
+        {"name": "Perkpocalypse", "categories": ["all"], "modifier": 1.1, "description": "All previous mayor perks active"}
+      ]
+    },
+    "Scorpius": {
+      "perks": [
+        {"name": "Bribe", "categories": ["dungeon", "dark_auction"], "modifier": 1.2, "description": "Bribe perks"}
+      ]
+    }
+  },
+  "notes": "Modifiers >1 positive, <1 negative. Derpy is special: multiplier 4.0 tax. Used by MayorPriceModifier and TaxCalculator. Research from wiki."
+}

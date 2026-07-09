@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "bazaarflipper",
+  "version": "${version}",
+  "name": "Bazaar Flipper",
+  "description": "Automated Hypixel Skyblock bazaar, NPC and AH craft flip mod with humanized navigation, mayor awareness, break scheduler and Discord integration.",
+  "authors": ["BazaarFlipper"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/bazaarflipper/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.bazaarflipper.BazaarFlipperMod"]
+  },
+  "mixins": ["bazaarflipper.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "26.1.2",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
