@@ -2,66 +2,25 @@ plugins {
     id 'fabric-loom' version '1.17-SNAPSHOT'
     id 'maven-publish'
 }
-
 version = project.mod_version
 group = project.maven_group
-
-base {
-    archivesName = 'bazaar-flipper'
-}
-
+base { archivesName = 'bazaar-flipper' }
 repositories {
     mavenCentral()
-    maven {
-        name = 'FabricMC'
-        url = 'https://maven.fabricmc.net/'
-    }
-    // JDA repository
-    maven {
-        url = 'https://m2.dv8tion.net/releases'
-    }
+    maven { name = 'FabricMC'; url = 'https://maven.fabricmc.net/' }
+    maven { name = 'DV8'; url = 'https://m2.dv8tion.net/releases' }
 }
-
-loom {
-    // Required for 26.1+ unobfuscated
-    // Ensure Mojang mappings are used
-}
-
+loom { }
 dependencies {
-    // Minecraft, intermediary, loader, mappings handled by loom
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings loom.officialMojangMappings()
-
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-
-    // JDA 5.x via jar-in-jar (include)
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
     implementation "net.dv8tion:JDA:${project.jda_version}"
     include "net.dv8tion:JDA:${project.jda_version}"
-
-    // Explicit gson (bundled but declared)
     implementation 'com.google.code.gson:gson:2.10.1'
     include 'com.google.code.gson:gson:2.10.1'
 }
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-    options.release = 21
-}
-
-java {
-    withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
-
-jar {
-    from('LICENSE') {
-        rename { "${it}_${project.base.archivesName.get()}"}
-    }
-    // Jar-in-jar note: Fabric Loom handles include via remapJar
-}
-
-loom {
-    // Include JDA etc
-}
+tasks.withType(JavaCompile).configureEach { options.encoding='UTF-8'; options.release=21 }
+java { withSourcesJar(); sourceCompatibility=JavaVersion.VERSION_21; targetCompatibility=JavaVersion.VERSION_21 }
+tasks.named('jar') { from('LICENSE') { rename { "${it}_${project.base.archivesName.get()}" } } }
