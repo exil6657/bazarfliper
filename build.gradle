@@ -31,18 +31,11 @@ processResources {
     inputs.property "version", version
     filesMatching("fabric.mod.json") { expand "version": version }
 }
-tasks.withType(JavaCompile).configureEach { it.options.encoding='UTF-8'; it.options.release=25 }
-java {
-    withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
-}
+tasks.withType(JavaCompile).configureEach { it.options.encoding='UTF-8'; it.options.release=21 }
+java { withSourcesJar(); sourceCompatibility=JavaVersion.VERSION_21; targetCompatibility=JavaVersion.VERSION_21 }
 jar {
     def projectName = project.name
     inputs.property "projectName", projectName
     from("LICENSE") { rename { "${it}_$projectName" } }
 }
-publishing {
-    publications { create("mavenJava", MavenPublication) { from components.java } }
-    repositories { }
-}
+publishing { publications { create("mavenJava", MavenPublication) { from components.java } } repositories { } }
