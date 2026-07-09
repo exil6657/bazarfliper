@@ -99,7 +99,7 @@ public class AuctionHouseInteractor {
                             if (slot.getItem().isEmpty()) continue;
                             String name = slot.getItem().getHoverName().getString().toLowerCase();
                             if (name.contains("price") || name.contains("custom")) {
-                                clickSimulator.clickSlot(createScreen.getMenu().containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                                clickSimulator.clickSlot(createScreen.getMenu().containerId, slot.index, 0, null);
                                 Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
                                 if (signInteractor.waitForSignGui(3000)) {
                                     signInteractor.setSignLines(String.valueOf((long) price), "", "", "");

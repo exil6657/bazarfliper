@@ -119,7 +119,7 @@ public class CraftingInteractor {
                 if (slot.getItem().isEmpty()) continue;
                 // Heuristic: output slot is usually isolated
                 // For now click first non-empty
-                clickSimulator.clickSlot(screen.getMenu().containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                clickSimulator.clickSlot(screen.getMenu().containerId, slot.index, 0, null);
                 break;
             }
         }

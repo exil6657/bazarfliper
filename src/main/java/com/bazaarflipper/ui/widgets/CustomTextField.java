@@ -89,7 +89,7 @@ public class CustomTextField {
 
         String displayComponent = text.isEmpty() && !focused ? placeholder : text;
         int textColor = text.isEmpty() && !focused ? ColorUtils.SECONDARY_TEXT : ColorUtils.PRIMARY_TEXT;
-        context.text(mc.font, displayText, x+4, y + (height - 8)/2, textColor, false);
+        context.text(mc.font, displayComponent, x+4, y + (height - 8)/2, textColor, false);
 
         // Blinking cursor rectangle
         if (focused) {
@@ -101,7 +101,7 @@ public class CustomTextField {
             if (cursorVisible) {
                 // Calculate cursor X based on text width up to cursorPos
                 String beforeCursor = text.substring(0, Math.min(cursorPos, text.length()));
-                int textWidth = mc.font.getWidth(beforeCursor);
+                int textWidth = mc.font.width(beforeCursor);
                 int cursorX = x + 4 + textWidth;
                 int cursorY = y + 2;
                 context.fill(cursorX, cursorY, cursorX+1, cursorY+height-4, ColorUtils.PRIMARY_TEXT);

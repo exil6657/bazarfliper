@@ -65,7 +65,7 @@ public class HudOverlay {
         String stateComponent = flipEngine.getState().name();
         String dot = "●";
         context.text(mc.font, dot, currentX+5, currentY+5, dotColor, false);
-        context.text(mc.font, stateText, currentX+15, currentY+5, ColorUtils.PRIMARY_TEXT, false);
+        context.text(mc.font, stateComponent, currentX+15, currentY+5, ColorUtils.PRIMARY_TEXT, false);
         context.text(mc.font, "Session: " + formatDuration(System.currentTimeMillis() - profitTracker.getSessionStartTime()), currentX+5, currentY+15, ColorUtils.SECONDARY_TEXT, false);
         currentY += 35;
 
@@ -104,7 +104,7 @@ public class HudOverlay {
         drawPanel(context, currentX, currentY, panelWidth, 60);
         if (breakScheduler.isOnBreak()) {
             String breakComponent = "On Break (" + formatDuration(breakScheduler.getRemainingBreakTime()) + " remaining)";
-            context.text(mc.font, breakText, currentX+5, currentY+5, ColorUtils.BREAK_PURPLE, false);
+            context.text(mc.font, breakComponent, currentX+5, currentY+5, ColorUtils.BREAK_PURPLE, false);
             // Progress bar
             long totalBreak = 60_000; // placeholder, actual duration from break record? We'll estimate
             long remaining = breakScheduler.getRemainingBreakTime();

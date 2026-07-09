@@ -29,7 +29,7 @@ public class PlayerStateDetector {
             // Parse from tab list: format [MVP+], [VIP] etc
             Collection<PlayerInfo> entries = mc.getConnection().getOnlinePlayers();
             for (PlayerInfo entry : entries) {
-                if (entry.getProfile() != null && entry.getProfile().getId().equals(mc.player.getUUID())) {
+                if (entry.getProfile() != null && entry.getProfile().id().equals(mc.player.getUUID())) {
                     String display = entry.getTabListDisplayName() != null ? ChatUtils.stripColorCodes(entry.getTabListDisplayName().getString()) : "";
                     // Also check tab list name via stripped color
                     if (display.contains("MVP++")) return PlayerCapabilityConfig.HypixelRank.MVP_PLUS_PLUS;

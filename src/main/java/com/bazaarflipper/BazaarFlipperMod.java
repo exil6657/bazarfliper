@@ -30,8 +30,6 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudElementRegistry;
-import net.minecraft.util.Identifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -287,30 +285,30 @@ public class BazaarFlipperMod implements ClientModInitializer {
                 "key.bazaarflipper.open_dashboard",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_RIGHT_CONTROL,
-                "category.bazaarflipper"
+                KeyMapping.Category.MISC
         ));
         toggleFlipperKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.toggle_flipper",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
-                "category.bazaarflipper"
+                KeyMapping.Category.MISC
         ));
         toggleHudKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.toggle_hud",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
-                "category.bazaarflipper"
+                KeyMapping.Category.MISC
         ));
         emergencyStopKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.emergency_stop",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
-                "category.bazaarflipper"
+                KeyMapping.Category.MISC
         ));
 
         // Register events
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
-        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("bazaarflipper", "hud"), this::onHudRender);
+        // HUD registration disabled at compile time for 26.1 API compatibility; dashboard remains available via keybind.
         ClientReceiveMessageEvents.GAME.register(this::onGameMessage);
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> onDisconnect());
         // Ensure all config saved even when restart game - save on client stopping
@@ -364,34 +362,7 @@ public class BazaarFlipperMod implements ClientModInitializer {
             handleEmergencyStop();
         }
 
-        // HUD drag handling - click to toggle collapsed/ drag to reposition
-        // Since HudRenderCallback doesn't provide mouse, we poll mouse state
-        try {
-            long window = client.getWindow().getHandle();
-            boolean leftDown = org.lwjgl.glfw.GLFW.glfwGetMouseButton(window, org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
-            double[] mx = new double[1];
-            double[] my = new double[1];
-            org.lwjgl.glfw.GLFW.glfwGetCursorPos(window, mx, my);
-            // Convert to scaled coordinates
-            double scale = client.getWindow().getScaleFactor();
-            double scaledX = mx[0] / scale;
-            double scaledY = my[0] / scale;
-
-            if (leftDown) {
-                if (!hudOverlay.isDragging() && hudOverlay.isMouseOver(scaledX, scaledY)) {
-                    hudOverlay.handleMouseDown(scaledX, scaledY);
-                }
-                if (hudOverlay.isDragging()) {
-                    hudOverlay.handleMouseDrag(scaledX, scaledY);
-                }
-            } else {
-                if (hudOverlay.isDragging()) {
-                    hudOverlay.handleMouseUp();
-                }
-                // Click toggle collapsed handled on mouse release to avoid drag conflict
-                // For simplicity, if mouse over and not dragging, toggle handled via separate click detection could be added via mixin
-            }
-        } catch (Exception ignored) {}
+        // HUD drag handling disabled for 26.1 compatibility.
 
         // Skip all tick logic if player is null or not on Hypixel Skyblock
         if (!isPlayerOnHypixelSkyblock(client)) {

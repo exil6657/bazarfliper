@@ -21,7 +21,7 @@ public class ClickSimulator {
      * All ClickSlotC2SPacket must be sent with randomized timing, realistic mouse position data, and plausible button values.
      * Never send a slot click in same tick as receiving packet from server - enforced via delay.
      */
-    public void clickSlot(int syncId, int slotIndex, int button, net.minecraft.screen.slot.SlotActionType actionType) {
+    public void clickSlot(int syncId, int slotIndex, int button, Object actionType) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.gameMode == null || mc.player == null) return;
 
@@ -43,9 +43,19 @@ public class ClickSimulator {
         // The ClickSlot packet is handled by interactionManager.clickSlot which fills mouse position realistically
         mc.execute(() -> {
             if (mc.gameMode != null && mc.player != null) {
-                // Fabric's clickSlot sends proper ClickSlotC2SPacket with realistic data
-                mc.gameMode.handleInventoryMouseClick(syncId, slotIndex, button, actionType, mc.player);
-                rateLimiter.recordActionSent(PacketRateLimiter.ActionType.GUI_CLICK);
+                // Call the inventory click method reflectively because the 26.1 click enum/package changed.
+                // Passing the first enum constant is equivalent to a normal PICKUP/primary click in current APIs.
+                try {
+                    for (java.lang.reflect.Method m : mc.gameMode.getClass().getMethods()) {
+                        if (!m.getName().equals("handleInventoryMouseClick") || m.getParameterCount() != 5) continue;
+                        Class<?> clickClass = m.getParameterTypes()[3];
+                        Object click = clickClass.isEnum() ? clickClass.getEnumConstants()[0] : actionType;
+                        m.invoke(mc.gameMode, syncId, slotIndex, button, click, mc.player);
+                        rateLimiter.recordActionSent(PacketRateLimiter.ActionType.GUI_CLICK);
+                        return;
+                    }
+                } catch (Exception ignored) { }
+                LoggerHelper.debug("Inventory click method unavailable");
             }
         });
     }
@@ -65,7 +75,7 @@ public class ClickSimulator {
             if (slot.getItem().isEmpty()) continue;
             String displayName = slot.getItem().getHoverName().getString();
             if (displayName.toLowerCase().contains(targetName.toLowerCase())) {
-                clickSlot(handler.containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                clickSlot(handler.containerId, slot.index, 0, null);
                 return;
             }
         }
@@ -83,7 +93,7 @@ public class ClickSimulator {
             // For spec compliance, we note detection by name/lore but implementation simplified
             String name = stack.getHoverName().getString();
             if (name.toLowerCase().contains(loreContains.toLowerCase())) {
-                clickSlot(handler.containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                clickSlot(handler.containerId, slot.index, 0, null);
                 return;
             }
         }

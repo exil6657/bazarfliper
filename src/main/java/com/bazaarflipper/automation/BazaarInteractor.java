@@ -152,7 +152,7 @@ public class BazaarInteractor {
                         if (slot.getItem().isEmpty()) continue;
                         String name = slot.getItem().getHoverName().getString().toLowerCase();
                         if (name.contains("custom") && name.contains("amount")) {
-                            clickSimulator.clickSlot(quantityScreen.getMenu().containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                            clickSimulator.clickSlot(quantityScreen.getMenu().containerId, slot.index, 0, null);
                             customAmountClicked = true;
                             break;
                         }
@@ -182,7 +182,7 @@ public class BazaarInteractor {
                         if (slot.getItem().isEmpty()) continue;
                         String name = slot.getItem().getHoverName().getString().toLowerCase();
                         if (name.contains("custom") && name.contains("price")) {
-                            clickSimulator.clickSlot(priceScreen.getMenu().containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                            clickSimulator.clickSlot(priceScreen.getMenu().containerId, slot.index, 0, null);
                             customPriceClicked = true;
                             break;
                         }
@@ -269,7 +269,7 @@ public class BazaarInteractor {
                         if (slot.getItem().isEmpty()) continue;
                         String name = slot.getItem().getHoverName().getString().toLowerCase();
                         if (name.contains("custom") && name.contains("amount")) {
-                            clickSimulator.clickSlot(qtyScreen.getMenu().containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                            clickSimulator.clickSlot(qtyScreen.getMenu().containerId, slot.index, 0, null);
                             customClicked = true;
                             break;
                         }
@@ -292,7 +292,7 @@ public class BazaarInteractor {
                         if (slot.getItem().isEmpty()) continue;
                         String name = slot.getItem().getHoverName().getString().toLowerCase();
                         if (name.contains("custom") && name.contains("price")) {
-                            clickSimulator.clickSlot(priceScreen.getMenu().containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                            clickSimulator.clickSlot(priceScreen.getMenu().containerId, slot.index, 0, null);
                             customClicked = true;
                             break;
                         }

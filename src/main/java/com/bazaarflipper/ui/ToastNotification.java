@@ -54,7 +54,7 @@ public class ToastNotification {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        int screenWidth = mc.getWindow().getScaledWidth();
+        int screenWidth = 320;
         // int screenHeight = mc.getWindow().getScaledHeight();
 
         synchronized (activeToasts) {

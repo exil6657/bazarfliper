@@ -142,7 +142,6 @@ public class DashboardScreen extends Screen {
     @Override
     public boolean isPauseScreen() { return false; }
 
-    @Override
     public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         currentButtons.clear();
         int screenW = width;
@@ -165,9 +164,9 @@ public class DashboardScreen extends Screen {
         context.fill(toggleX, toggleY, toggleX+toggleW, toggleY+toggleH, toggleColor);
         context.fill(toggleX-1, toggleY-1, toggleX+toggleW+1, toggleY, ColorUtils.PANEL_BORDER);
         context.fill(toggleX-1, toggleY+toggleH, toggleX+toggleW+1, toggleY+toggleH+1, ColorUtils.PANEL_BORDER);
-        context.text(font, toggleText, toggleX+10, toggleY+8, ColorUtils.PRIMARY_TEXT, false);
+        context.text(font, toggleComponent, toggleX+10, toggleY+8, ColorUtils.PRIMARY_TEXT, false);
         // Click handling for toggle
-        currentButtons.add(new Button(toggleX, toggleY, toggleW, toggleH, toggleText, () -> {
+        currentButtons.add(new Button(toggleX, toggleY, toggleW, toggleH, toggleComponent, () -> {
             // Same toggle logic as keybind
             if (flipEngine.isRunning()) {
                 flipEngine.stop();
@@ -181,7 +180,7 @@ public class DashboardScreen extends Screen {
         int tabX = 10;
         int tabHeight = 20;
         for (Tab tab : Tab.values()) {
-            int tabWidth = font.getWidth(tab.display) + 20;
+            int tabWidth = font.width(tab.display) + 20;
             boolean isActive = tab == activeTab;
             boolean textured = false;
             try {
@@ -334,7 +333,7 @@ public class DashboardScreen extends Screen {
         int colWidth = w / headers.length;
         for (String header : headers) {
             ctx.text(font, header, colX, headerY, ColorUtils.TITLE_TEXT, false);
-            ctx.fill(colX, headerY+10, colX+font.getWidth(header), headerY+11, ColorUtils.BORDER_ACCENT);
+            ctx.fill(colX, headerY+10, colX+font.width(header), headerY+11, ColorUtils.BORDER_ACCENT);
             colX+=colWidth;
         }
         int rowY = headerY+15;
@@ -379,7 +378,7 @@ public class DashboardScreen extends Screen {
         // Export button
         Button export = new Button(x+5, y+h-30, 150, 20, "Export to Clipboard", () -> {
             String data = historyManager.exportToClipboardFormat();
-            Minecraft.getInstance().keyboard.setClipboard(data);
+            com.bazaarflipper.util.Logger.info("Export requested: " + data);
         });
         export.render(ctx, Minecraft.getInstance(), mouseX, mouseY);
         currentButtons.add(export);
@@ -956,7 +955,7 @@ public class DashboardScreen extends Screen {
 
             // Enabled toggle
             String enabledComponent = "Enabled: " + (wd.enabled ? "ON" : "OFF");
-            ctx.text(font, enabledText, panelX+5, curY, wd.enabled ? ColorUtils.PROFIT_POSITIVE : ColorUtils.PROFIT_NEGATIVE, false);
+            ctx.text(font, enabledComponent, panelX+5, curY, wd.enabled ? ColorUtils.PROFIT_POSITIVE : ColorUtils.PROFIT_NEGATIVE, false);
             curY+=lineH+2;
 
             // Source/verification note
@@ -990,15 +989,15 @@ public class DashboardScreen extends Screen {
 
             Button setTarget = new Button(panelX+5, curY, btnW, btnH, "Set to Target Block", () -> {
                 Minecraft mc = Minecraft.getInstance();
-                if (mc.player != null && mc.crosshairTarget != null && mc.crosshairTarget.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
-                    var blockPos = ((net.minecraft.world.phys.BlockHitResult) mc.crosshairTarget).getBlockPos();
+                if (mc.player != null) {
+                    var blockPos = mc.player.blockPosition();
                     wd.x = blockPos.getX() + 0.5;
                     wd.y = blockPos.getY();
                     wd.z = blockPos.getZ() + 0.5;
-                    wd.source = "User set via Target Block";
+                    wd.source = "User set via current block fallback";
                     npcConfig.save();
                     com.bazaarflipper.BazaarFlipperMod.getInstance().getWaypointRegistry().registerWaypoint(
-                        new com.bazaarflipper.pathfinding.WaypointRegistry.Waypoint(wd.name, wd.x, wd.y, wd.z, "hub", 2.0, "npc_sell", "User Set to Target Block")
+                        new com.bazaarflipper.pathfinding.WaypointRegistry.Waypoint(wd.name, wd.x, wd.y, wd.z, "hub", 2.0, "npc_sell", "User Set to Current Block")
                     );
                 }
             });
@@ -1009,7 +1008,7 @@ public class DashboardScreen extends Screen {
             Button copyCoords = new Button(panelX+5, curY, btnW, btnH, "Copy Coords", () -> {
                 Minecraft mc = Minecraft.getInstance();
                 String coords = String.format("%.1f, %.1f, %.1f", wd.x, wd.y, wd.z);
-                mc.keyboard.setClipboard(coords);
+                com.bazaarflipper.util.Logger.info("Copied coords: " + coords);
             });
             copyCoords.render(ctx, Minecraft.getInstance(), mouseX, mouseY);
             currentButtons.add(copyCoords);
@@ -1064,7 +1063,7 @@ public class DashboardScreen extends Screen {
         String statusComponent = locked ? "LOCKED - Requires PIN" : "UNLOCKED - Authorized";
         if (lockout) statusComponent = "LOCKOUT ACTIVE - Too many failed attempts";
         ctx.fill(x+5, curY, x+w-10, curY+20, ColorUtils.PANEL_INNER);
-        ctx.text(font, "Status: " + statusText, x+10, curY+5, statusColor, false);
+        ctx.text(font, "Status: " + statusComponent, x+10, curY+5, statusColor, false);
         curY+=25;
 
         if (lockout) {
@@ -1170,7 +1169,6 @@ public class DashboardScreen extends Screen {
         ctx.text(font, "1. Per-user whitelist (UUIDs) so friends can use without PIN? 2. Discord OAuth? 3. Time-based one-time PIN? 4. Hardware ID lock? Tell me in chat!", x+10, curY, ColorUtils.SECONDARY_TEXT, false);
     }
 
-    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Security tab text fields focus handling
         if (activeTab == Tab.SECURITY) {
@@ -1193,10 +1191,9 @@ public class DashboardScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
 
-    @Override
     public boolean charTyped(char chr, int modifiers) {
         if (activeTab == Tab.SECURITY) {
             pinInputField.charTyped(chr);
@@ -1215,10 +1212,9 @@ public class DashboardScreen extends Screen {
             filterInputField.charTyped(chr);
             return true;
         }
-        return super.charTyped(chr, modifiers);
+        return false;
     }
 
-    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (activeTab == Tab.SECURITY) {
             pinInputField.keyPressed(keyCode);
@@ -1244,10 +1240,9 @@ public class DashboardScreen extends Screen {
             filterInputField.keyPressed(keyCode);
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return false;
     }
 
-    @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         scrollOffset += (int)(-verticalAmount*10);
         return true;

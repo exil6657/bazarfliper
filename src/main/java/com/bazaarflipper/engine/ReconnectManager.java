@@ -26,7 +26,7 @@ public class ReconnectManager {
         this.sessionStateManager = sessionStateManager;
         this.discordHandler = discordHandler;
         this.config = config;
-        this.levelStateRecovery = recovery;
+        this.worldStateRecovery = recovery;
         this.locationValidator = validator;
     }
 
