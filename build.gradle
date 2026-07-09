@@ -4,6 +4,7 @@ plugins {
 }
 version = project.mod_version
 group = project.maven_group
+base { archivesName = project.archives_base_name }
 repositories {
     mavenCentral()
     maven { name = 'DV8'; url = 'https://m2.dv8tion.net/releases' }
@@ -19,6 +20,7 @@ loom {
 }
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
     implementation "net.dv8tion:JDA:${project.jda_version}"
@@ -31,8 +33,8 @@ processResources {
     inputs.property "version", version
     filesMatching("fabric.mod.json") { expand "version": version }
 }
-tasks.withType(JavaCompile).configureEach { it.options.encoding='UTF-8'; it.options.release=21 }
-java { withSourcesJar(); sourceCompatibility=JavaVersion.VERSION_21; targetCompatibility=JavaVersion.VERSION_21 }
+tasks.withType(JavaCompile).configureEach { it.options.encoding='UTF-8'; it.options.release=25 }
+java { withSourcesJar(); sourceCompatibility=JavaVersion.VERSION_25; targetCompatibility=JavaVersion.VERSION_25 }
 jar {
     def projectName = project.name
     inputs.property "projectName", projectName

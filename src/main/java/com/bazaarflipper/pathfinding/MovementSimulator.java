@@ -2,9 +2,9 @@ package com.bazaarflipper.pathfinding;
 
 import com.bazaarflipper.util.Logger;
 import com.bazaarflipper.util.MathUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.GameOptions;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Options;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Random;
 
@@ -20,7 +20,7 @@ import java.util.Random;
  * - Velocity smoothing, not zero instant stop
  * - Random micro-adjustments even when idle (human never perfectly still)
  * - Head bob independent
- * - Uses MinecraftClient.options key bindings .setPressed() per spec
+ * - Uses Minecraft.options key bindings .setPressed() per spec
  * Credits: Cldz
  */
 public class MovementSimulator {
@@ -33,12 +33,12 @@ public class MovementSimulator {
     private long lastJump = 0;
 
     // Spec requires pressKey(GameOptions option, boolean pressed)
-    public void pressKey(GameOptions options, boolean pressed) {
+    public void pressKey(Options options, boolean pressed) {
         // Placeholder for spec compliance - actual key pressing done via specific key methods
-        // Uses MinecraftClient.getInstance().options key bindings pattern
+        // Uses Minecraft.getInstance().options key bindings pattern
     }
 
-    public void pressKey(net.minecraft.client.option.KeyBinding keyBinding, boolean pressed) {
+    public void pressKey(net.minecraft.client.KeyMapping keyBinding, boolean pressed) {
         if (keyBinding != null) {
             // Add tiny random delay to simulate human reaction time 20-80ms
             long delay = MathUtils.randomInt(20, 80);
@@ -54,7 +54,7 @@ public class MovementSimulator {
     }
 
     public void pressForward(boolean pressed) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.options == null) return;
 
         long now = System.currentTimeMillis();
@@ -62,13 +62,13 @@ public class MovementSimulator {
         if (pressed) {
             if (now - lastForwardToggle > MathUtils.randomInt(800, 2000)) {
                 if (random.nextDouble() < 0.05) { // 5% chance irregular release
-                    mc.options.forwardKey.setPressed(false);
+                    mc.options.keyUp.setPressed(false);
                     currentForwardPressure = 0;
                     lastForwardToggle = now;
                     // Re-press after brief
                     new Thread(() -> {
                         try { Thread.sleep(MathUtils.randomInt(20, 60)); } catch (InterruptedException ignored) {}
-                        if (mc.options != null) mc.options.forwardKey.setPressed(true);
+                        if (mc.options != null) mc.options.keyUp.setPressed(true);
                     }).start();
                     return;
                 }
@@ -88,40 +88,40 @@ public class MovementSimulator {
 
         // In Minecraft digital input we can't truly analog, but we can simulate via occasional release
         // For simplicity we still set pressed true if finalPressure >0.15
-        mc.options.forwardKey.setPressed(pressed && finalPressure > 0.15);
+        mc.options.keyUp.setPressed(pressed && finalPressure > 0.15);
         if (pressed) lastForwardToggle = now;
     }
 
     public void pressBack(boolean pressed) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.options != null) {
             // Backwards slower, add extra delay
             long delay = pressed ? MathUtils.randomInt(30, 90) : MathUtils.randomInt(20, 60);
             try { Thread.sleep(delay / 10); } catch (InterruptedException ignored) {} // tiny, not blocking too much
-            mc.options.backKey.setPressed(pressed);
+            mc.options.keyDown.setPressed(pressed);
         }
     }
 
     public void pressLeft(boolean pressed) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.options != null) {
             // Strafe has slight anticipation: human leans before strafing, simulate via tiny yaw nudge
             if (pressed && random.nextDouble() < 0.3) {
                 float yawNudge = random.nextBoolean() ? -2f : 2f;
-                setYaw(mc.player != null ? mc.player.getYaw() + yawNudge : 0, 8f);
+                setYaw(mc.player != null ? mc.player.getYRot() + yawNudge : 0, 8f);
             }
-            mc.options.leftKey.setPressed(pressed);
+            mc.options.keyLeft.setPressed(pressed);
         }
     }
 
     public void pressRight(boolean pressed) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.options != null) {
             if (pressed && random.nextDouble() < 0.3) {
                 float yawNudge = random.nextBoolean() ? -2f : 2f;
-                setYaw(mc.player != null ? mc.player.getYaw() + yawNudge : 0, 8f);
+                setYaw(mc.player != null ? mc.player.getYRot() + yawNudge : 0, 8f);
             }
-            mc.options.rightKey.setPressed(pressed);
+            mc.options.keyRight.setPressed(pressed);
         }
     }
 
@@ -131,9 +131,9 @@ public class MovementSimulator {
      * @param speed max speed per tick (higher = faster)
      */
     public void setYaw(float targetYaw, float speed) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        float current = mc.player.getYaw();
+        float current = mc.player.getYRot();
         float diff = targetYaw - current;
         while (diff > 180) diff -= 360;
         while (diff < -180) diff += 360;
@@ -152,36 +152,40 @@ public class MovementSimulator {
         }
 
         float newYaw = current + step;
-        mc.player.setYaw(newYaw);
+        mc.player.setYRot(newYaw);
         lastYaw = newYaw;
     }
 
     public void setPitch(float targetPitch, float speed) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        float current = mc.player.getPitch();
+        float current = mc.player.getXRot();
         targetPitch = MathUtils.clamp(targetPitch, -85f, 85f);
         float diff = targetPitch - current;
         double noise = (random.nextDouble() - 0.5) * 0.5;
         float step = (float) (Math.signum(diff) * Math.min(Math.abs(diff), speed + noise));
         float newPitch = current + step;
-        mc.player.setPitch(newPitch);
+        mc.player.setXRot(newPitch);
         lastPitch = newPitch;
     }
 
-    public void lookAt(Vec3d targetPos) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+    // Mojang-named aliases used by remapped call sites.
+    public void setYRot(float targetYaw, float speed) { setYaw(targetYaw, speed); }
+    public void setXRot(float targetPitch, float speed) { setPitch(targetPitch, speed); }
+
+    public void lookAt(Vec3 targetPos) {
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        Vec3d eyePos = mc.player.getEyePos();
-        Vec3d diff = targetPos.subtract(eyePos);
+        Vec3 eyePos = mc.player.getEyePosition();
+        Vec3 diff = targetPos.subtract(eyePos);
         double dist = Math.sqrt(diff.x * diff.x + diff.z * diff.z);
         float yaw = (float) Math.toDegrees(Math.atan2(diff.z, diff.x)) - 90F;
         float pitch = (float) -Math.toDegrees(Math.atan2(diff.y, dist));
 
         // Saccadic eye movement: human looks with multiple small jumps, not one smooth motion
         // Simulate via bezier intermediate waypoints
-        float currentYaw = mc.player.getYaw();
-        float currentPitch = mc.player.getPitch();
+        float currentYaw = mc.player.getYRot();
+        float currentPitch = mc.player.getXRot();
 
         // Bezier control points for look movement
         float midYaw = MathUtils.lerp(currentYaw, yaw, 0.5f) + MathUtils.randomInt(-5,5);
@@ -206,7 +210,7 @@ public class MovementSimulator {
     }
 
     public void jump() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         long now = System.currentTimeMillis();
         if (now - lastJump < MathUtils.randomInt(300, 600)) return; // prevent spam jump, human needs recovery
@@ -214,7 +218,7 @@ public class MovementSimulator {
         // Pre-jump crouch simulation? In Minecraft no crouch before jump but human slightly looks down before jump
         // Add slight pitch down before jump 10% chance
         if (random.nextDouble() < 0.1) {
-            setPitch(mc.player.getPitch() + MathUtils.randomInt(2,5), 10f);
+            setPitch(mc.player.getXRot() + MathUtils.randomInt(2,5), 10f);
         }
 
         // Variable jump height based on sprinting and forward pressure
@@ -222,23 +226,23 @@ public class MovementSimulator {
         double jumpVelocity = sprinting ? 0.42 + random.nextDouble()*0.03 : 0.40 + random.nextDouble()*0.02;
 
         // Use player.jump() which handles velocity, but we add slight randomness
-        mc.player.jump();
+        mc.player.jumpFromGround();
         // Modify velocity slightly for human variation
         try {
-            Vec3d vel = mc.player.getVelocity();
+            Vec3 vel = mc.player.getDeltaMovement();
             double variationX = (random.nextDouble()-0.5)*0.02;
             double variationZ = (random.nextDouble()-0.5)*0.02;
-            mc.player.setVelocity(vel.x + variationX, jumpVelocity, vel.z + variationZ);
+            mc.player.setDeltaMovement(vel.x + variationX, jumpVelocity, vel.z + variationZ);
         } catch (Exception e) {
             // Fallback to normal jump
-            mc.player.jump();
+            mc.player.jumpFromGround();
         }
 
         lastJump = now;
     }
 
     public void sprint(boolean sprinting) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
         // Human doesn't sprint instantly, slight delay and double-tap simulation
@@ -264,30 +268,30 @@ public class MovementSimulator {
     }
 
     public void stopAllMovement() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.options == null) return;
 
         // Deceleration curve, not instant stop for realism: release keys with slight stagger
-        mc.options.forwardKey.setPressed(false);
+        mc.options.keyUp.setPressed(false);
         try { Thread.sleep(MathUtils.randomInt(10,30)); } catch (InterruptedException ignored) {}
-        mc.options.leftKey.setPressed(false);
-        mc.options.rightKey.setPressed(false);
+        mc.options.keyLeft.setPressed(false);
+        mc.options.keyRight.setPressed(false);
         try { Thread.sleep(MathUtils.randomInt(10,30)); } catch (InterruptedException ignored) {}
-        mc.options.backKey.setPressed(false);
-        mc.options.jumpKey.setPressed(false);
-        mc.options.sprintKey.setPressed(false);
+        mc.options.keyDown.setPressed(false);
+        mc.options.keyJump.setPressed(false);
+        mc.options.keySprint.setPressed(false);
 
         currentForwardPressure = 0;
 
         if (mc.player != null) {
             // Velocity smoothing: not zero instantly, but multiply by 0.7-0.9 to simulate inertia, then zero after short delay
-            Vec3d currentVel = mc.player.getVelocity();
-            Vec3d slowed = new Vec3d(currentVel.x * 0.5, currentVel.y, currentVel.z * 0.5);
-            mc.player.setVelocity(slowed);
+            Vec3 currentVel = mc.player.getDeltaMovement();
+            Vec3 slowed = new Vec3(currentVel.x * 0.5, currentVel.y, currentVel.z * 0.5);
+            mc.player.setDeltaMovement(slowed);
             new Thread(() -> {
                 try { Thread.sleep(80); } catch (InterruptedException ignored) {}
                 try {
-                    if (mc.player != null) mc.player.setVelocity(Vec3d.ZERO);
+                    if (mc.player != null) mc.player.setDeltaMovement(Vec3.ZERO);
                 } catch (Exception ignored) {}
             }).start();
         }
@@ -305,12 +309,12 @@ public class MovementSimulator {
     }
 
     public void lookAroundIdly() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         float yawChange = MathUtils.randomInt(-35,35);
         float pitchChange = MathUtils.randomInt(-15,15);
-        setYaw(mc.player.getYaw() + yawChange, MathUtils.randomInt(2,5));
-        setPitch(mc.player.getPitch() + pitchChange, MathUtils.randomInt(2,5));
+        setYaw(mc.player.getYRot() + yawChange, MathUtils.randomInt(2,5));
+        setPitch(mc.player.getXRot() + pitchChange, MathUtils.randomInt(2,5));
     }
 
     public void tinyShuffleStep() {

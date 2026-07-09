@@ -4,9 +4,9 @@ import com.bazaarflipper.engine.GuiWatchdog;
 import com.bazaarflipper.pathfinding.HumanizedNavigator;
 import com.bazaarflipper.pathfinding.LocationValidator;
 import com.bazaarflipper.util.Logger;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
+import net.minecraft.world.item.ItemStack;
 
 public class AuctionHouseInteractor {
     private final LocationValidator locationValidator;
@@ -53,13 +53,13 @@ public class AuctionHouseInteractor {
     }
 
     private boolean interactWithNpc(String nameContains) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.world == null || mc.player == null) return false;
-        for (var entity : mc.world.getEntities()) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.player == null) return false;
+        for (var entity : mc.level.entitiesForRendering()) {
             if (entity.getName().getString().toLowerCase().contains(nameContains.toLowerCase())) {
-                double dist = entity.getPos().distanceTo(mc.player.getPos());
+                double dist = entity.position().distanceTo(mc.player.position());
                 if (dist < 5) {
-                    mc.interactionManager.interactEntity(mc.player, entity, net.minecraft.util.Hand.MAIN_HAND);
+                    mc.gameMode.interact(mc.player, entity, net.minecraft.world.InteractionHand.MAIN_HAND);
                     return waitForGui("Auction House");
                 }
             }
@@ -71,19 +71,19 @@ public class AuctionHouseInteractor {
         if (!openAH()) return false;
         watchdog.notifyGuiOpened("Auction House");
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
+            Minecraft mc = Minecraft.getInstance();
             // Steps: Manage Auctions -> Create Auction -> put item -> BIN -> set price -> confirm
             // Per fandom: AH bottom row Search (Oak Wood Sign), Item Tier Eye of Ender, Sort Hopper, BIN Filter
-            if (mc.currentScreen instanceof GenericContainerScreen ahScreen) {
+            if (mc.screen instanceof ContainerScreen ahScreen) {
                 clickSimulator.clickSlotByDisplayName(ahScreen, "Manage Auctions");
                 Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
-                if (mc.currentScreen instanceof GenericContainerScreen manageScreen) {
+                if (mc.screen instanceof ContainerScreen manageScreen) {
                     clickSimulator.clickSlotByDisplayName(manageScreen, "Create Auction");
                     Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
                     // Place item - click to place held item (simplified)
                     // The item to list should be held or in inventory - we would need to click slot where item should go
                     // Placeholder: try to find empty slot for item placement
-                    if (mc.currentScreen instanceof GenericContainerScreen createScreen) {
+                    if (mc.screen instanceof ContainerScreen createScreen) {
                         // Try to click first empty slot or slot with item placeholder
                         // For humanization, we would have already had item in inventory and click to move
                         // After placing item, set BIN price via sign (not chat) - per research AH uses sign for price? Actually AH uses sign for search, price via anvil or sign?
@@ -95,11 +95,11 @@ public class AuctionHouseInteractor {
                         // Try sign for price
                         boolean priceViaSign = false;
                         // Look for sign slot with "Price" or "Custom Price"
-                        for (var slot : createScreen.getScreenHandler().slots) {
-                            if (slot.getStack().isEmpty()) continue;
-                            String name = slot.getStack().getName().getString().toLowerCase();
+                        for (var slot : createScreen.getMenu().slots) {
+                            if (slot.getItem().isEmpty()) continue;
+                            String name = slot.getItem().getHoverName().getString().toLowerCase();
                             if (name.contains("price") || name.contains("custom")) {
-                                clickSimulator.clickSlot(createScreen.getScreenHandler().syncId, slot.id, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                                clickSimulator.clickSlot(createScreen.getMenu().containerId, slot.index, 0, net.minecraft.world.inventory.ClickType.PICKUP);
                                 Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
                                 if (signInteractor.waitForSignGui(3000)) {
                                     signInteractor.setSignLines(String.valueOf((long) price), "", "", "");
@@ -111,17 +111,17 @@ public class AuctionHouseInteractor {
                         }
                         if (!priceViaSign) {
                             // Fallback old chat method (anvil may use chat)
-                            commandSender.sendChatMessage(String.valueOf((long) price));
+                            commandSender.sendChat(String.valueOf((long) price));
                             Thread.sleep(delayManager.getDelay(DelayManager.DelayType.CLICK));
                         }
 
                         // Click BIN toggle then confirm
-                        if (mc.currentScreen instanceof GenericContainerScreen finalScreen) {
+                        if (mc.screen instanceof ContainerScreen finalScreen) {
                             clickSimulator.clickSlotByDisplayName(finalScreen, "Create BIN");
                             Thread.sleep(delayManager.getDelay(DelayManager.DelayType.CLICK));
                             clickSimulator.clickSlotByDisplayName(finalScreen, "Confirm");
                             Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
-                            Logger.info("BIN listing created via sign/price input for " + item.getName().getString() + " @ " + price + " - credits Cldz");
+                            Logger.info("BIN listing created via sign/price input for " + item.getHoverName().getString() + " @ " + price + " - credits Cldz");
                             return true;
                         }
                     }
@@ -140,8 +140,8 @@ public class AuctionHouseInteractor {
         if (!openAH()) return false;
         watchdog.notifyGuiOpened("Auction House Search");
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.currentScreen instanceof GenericContainerScreen ahScreen) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.screen instanceof ContainerScreen ahScreen) {
                 clickSimulator.clickSlotByDisplayName(ahScreen, "Search");
                 Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
                 if (signInteractor.waitForSignGui(3000)) {
@@ -151,7 +151,7 @@ public class AuctionHouseInteractor {
                     return true;
                 } else {
                     // Fallback to chat
-                    commandSender.sendChatMessage(query);
+                    commandSender.sendChat(query);
                     Thread.sleep(delayManager.getDelay(DelayManager.DelayType.CLICK));
                     return true;
                 }
@@ -168,8 +168,8 @@ public class AuctionHouseInteractor {
         if (!openAH()) return false;
         watchdog.notifyGuiOpened("Auction House");
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.currentScreen instanceof GenericContainerScreen ahScreen) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.screen instanceof ContainerScreen ahScreen) {
                 clickSimulator.clickSlotByDisplayName(ahScreen, "Manage Auctions");
                 Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
                 // Would parse listings
@@ -201,9 +201,9 @@ public class AuctionHouseInteractor {
         long timeout = 5000 + 100 * 3;
         timeout = Math.min(Math.max(timeout, 3000), 15000);
         while (System.currentTimeMillis() - start < timeout) {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.currentScreen != null) {
-                String title = mc.currentScreen.getTitle().getString();
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.screen != null) {
+                String title = mc.screen.getTitle().getString();
                 if (title.toLowerCase().contains(expectedContains.toLowerCase())) return true;
             }
             try { Thread.sleep(50); } catch (InterruptedException e) { return false; }

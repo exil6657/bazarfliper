@@ -2,11 +2,11 @@ package com.bazaarflipper.ui.widgets;
 
 import com.bazaarflipper.ui.GuiTextures;
 import com.bazaarflipper.util.ColorUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 
 /**
- * Text field drawn via fill + texture background + blinking cursor rectangle per spec
+ * Component field drawn via fill + texture background + blinking cursor rectangle per spec
  * Border valid/invalid, background InputField background
  * Fully custom, no vanilla widget
  */
@@ -66,8 +66,8 @@ public class CustomTextField {
         }
     }
 
-    public void render(DrawContext context, int mouseX, int mouseY) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+    public void render(GuiGraphics context, int mouseX, int mouseY) {
+        Minecraft mc = Minecraft.getInstance();
         int borderColor = valid ? ColorUtils.INPUT_BORDER_VALID : ColorUtils.INPUT_BORDER_INVALID;
 
         // Try textured background first, fallback to fill
@@ -77,8 +77,8 @@ public class CustomTextField {
         // Background - try texture if available, else fill
         boolean useTexture = true;
         try {
-            // For 26.1.2, DrawContext.drawTexture with Identifier
-            context.drawTexture(GuiTextures.PANEL_BG, x, y, 0, 0, width, height, width, height);
+            // For 26.1.2, GuiGraphics.drawTexture with ResourceLocation
+            context.blit(GuiTextures.PANEL_BG, x, y, 0, 0, width, height, width, height);
         } catch (Exception e) {
             useTexture = false;
             context.fill(x, y, x+width, y+height, ColorUtils.INPUT_BG);
@@ -87,9 +87,9 @@ public class CustomTextField {
             context.fill(x, y, x+width, y+height, ColorUtils.INPUT_BG);
         }
 
-        String displayText = text.isEmpty() && !focused ? placeholder : text;
+        String displayComponent = text.isEmpty() && !focused ? placeholder : text;
         int textColor = text.isEmpty() && !focused ? ColorUtils.SECONDARY_TEXT : ColorUtils.PRIMARY_TEXT;
-        context.drawText(mc.textRenderer, displayText, x+4, y + (height - 8)/2, textColor, false);
+        context.drawString(mc.font, displayText, x+4, y + (height - 8)/2, textColor, false);
 
         // Blinking cursor rectangle
         if (focused) {
@@ -101,7 +101,7 @@ public class CustomTextField {
             if (cursorVisible) {
                 // Calculate cursor X based on text width up to cursorPos
                 String beforeCursor = text.substring(0, Math.min(cursorPos, text.length()));
-                int textWidth = mc.textRenderer.getWidth(beforeCursor);
+                int textWidth = mc.font.getWidth(beforeCursor);
                 int cursorX = x + 4 + textWidth;
                 int cursorY = y + 2;
                 context.fill(cursorX, cursorY, cursorX+1, cursorY+height-4, ColorUtils.PRIMARY_TEXT);

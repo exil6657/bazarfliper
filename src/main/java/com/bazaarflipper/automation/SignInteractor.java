@@ -1,11 +1,11 @@
 package com.bazaarflipper.automation;
 
 import com.bazaarflipper.util.Logger;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.SignEditScreen;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.block.entity.SignBlockEntity;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.SignEditScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.core.BlockPos;
 
 /**
  * Handles Hypixel custom sign input for bazaar search, quantity, price, auction house search
@@ -41,8 +41,8 @@ public class SignInteractor {
     public boolean waitForSignGui(long timeoutMs) {
         long start = System.currentTimeMillis();
         while (System.currentTimeMillis() - start < timeoutMs) {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            Screen current = mc.currentScreen;
+            Minecraft mc = Minecraft.getInstance();
+            Screen current = mc.screen;
             if (current instanceof SignEditScreen) {
                 Logger.info("SignEditScreen detected");
                 return true;
@@ -64,8 +64,8 @@ public class SignInteractor {
      * @return true if successful
      */
     public boolean setSignTextAndSubmit(String text) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        Screen screen = mc.currentScreen;
+        Minecraft mc = Minecraft.getInstance();
+        Screen screen = mc.screen;
         if (!(screen instanceof SignEditScreen signScreen)) {
             // Try to handle via reflection for different mappings (AbstractSignEditScreen in Mojang)
             if (screen == null || !screen.getClass().getSimpleName().toLowerCase().contains("sign")) {
@@ -85,15 +85,15 @@ public class SignInteractor {
 
             // Close sign to submit - in vanilla, closing sends UpdateSign packet
             mc.execute(() -> {
-                // SignEditScreen has method to finish editing - usually via close() or via packet
-                // We simulate pressing done button: signScreen.close() -> sends packet
-                signScreen.close();
+                // SignEditScreen has method to finish editing - usually via onClose() or via packet
+                // We simulate pressing done button: signScreen.onClose() -> sends packet
+                signScreen.onClose();
             });
 
             // Wait for sign screen to close and container GUI to return
             long start = System.currentTimeMillis();
             while (System.currentTimeMillis() - start < 2000) {
-                if (mc.currentScreen == null || !(mc.currentScreen instanceof SignEditScreen)) {
+                if (mc.screen == null || !(mc.screen instanceof SignEditScreen)) {
                     Logger.info("Sign submitted successfully with text: " + text);
                     return true;
                 }
@@ -109,7 +109,7 @@ public class SignInteractor {
     private boolean setSignTextGeneric(Screen screen, String text) {
         // Generic fallback for Mojang mappings where sign screen class name differs
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
+            Minecraft mc = Minecraft.getInstance();
             // Try via reflection to find text field or sign block entity
             // In 26.1.2, SignEditScreen has a SignBlockEntity field and methods to set lines
             // We attempt to use mc.player.networkHandler.sendPacket(new UpdateSignC2SPacket(...)) directly as alternative
@@ -132,22 +132,22 @@ public class SignInteractor {
             }
 
             if (signEntity != null) {
-                BlockPos pos = signEntity.getPos();
+                BlockPos pos = signEntity.getBlockPos();
                 // Set first line to text, others empty
                 // In 26.1.2, sign text is via front text
                 try {
-                    // Try via setText - method varies by mappings
-                    // For Mojang mappings: signEntity.getFrontText().setMessage(0, Text.literal(text))
+                    // Try via setComponent - method varies by mappings
+                    // For Mojang mappings: signEntity.getFrontText().setMessage(0, Component.literal(text))
                     var front = signEntity.getFrontText();
-                    front.setMessage(0, net.minecraft.text.Text.literal(text));
+                    front.setMessage(0, net.minecraft.network.chat.Component.literal(text));
                     // Send packet
                     mc.execute(() -> {
-                        if (mc.getNetworkHandler() != null) {
+                        if (mc.getConnection() != null) {
                             // UpdateSignC2SPacket with pos and lines
-                            // Need to construct packet - API may be net.minecraft.network.packet.c2s.play.UpdateSignC2SPacket
+                            // Need to construct packet - API may be net.minecraft.network.protocol.game.ServerboundSignUpdatePacket
                             try {
-                                var packet = new net.minecraft.network.packet.c2s.play.UpdateSignC2SPacket(pos, true, text, "", "", "");
-                                mc.getNetworkHandler().sendPacket(packet);
+                                var packet = new net.minecraft.network.protocol.game.ServerboundSignUpdatePacket(pos, true, text, "", "", "");
+                                mc.getConnection().send(packet);
                             } catch (Exception ex) {
                                 Logger.error("Failed to send UpdateSign packet", ex);
                             }
@@ -155,7 +155,7 @@ public class SignInteractor {
                     });
                     Thread.sleep(200);
                     mc.execute(() -> {
-                        if (mc.currentScreen != null) mc.setScreen(null);
+                        if (mc.screen != null) mc.setScreen(null);
                     });
                     return true;
                 } catch (Exception ex) {
@@ -186,7 +186,7 @@ public class SignInteractor {
 
         // Actually set text - try via reflection to set line 0
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
+            Minecraft mc = Minecraft.getInstance();
             mc.execute(() -> {
                 try {
                     // In Yarn, SignEditScreen has method setCurrentRow? Or we can access field
@@ -221,7 +221,7 @@ public class SignInteractor {
     public boolean clickSignAndInput(ClickSimulator clickSimulator, int screenHandlerSyncId, int signSlotId, String text) {
         try {
             // Click sign slot
-            clickSimulator.clickSlot(screenHandlerSyncId, signSlotId, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+            clickSimulator.clickSlot(screenHandlerSyncId, signSlotId, 0, net.minecraft.world.inventory.ClickType.PICKUP);
 
             // Wait for sign GUI
             if (!waitForSignGui(3000)) {
@@ -244,13 +244,13 @@ public class SignInteractor {
      * This sets all 4 lines if provided, else first line only.
      */
     public boolean setSignLines(String line1, String line2, String line3, String line4) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (!(mc.currentScreen instanceof SignEditScreen)) {
+        Minecraft mc = Minecraft.getInstance();
+        if (!(mc.screen instanceof SignEditScreen)) {
             return setSignLinesGeneric(line1, line2, line3, line4);
         }
 
         try {
-            SignEditScreen signScreen = (SignEditScreen) mc.currentScreen;
+            SignEditScreen signScreen = (SignEditScreen) mc.screen;
             // Try to set each line
             // In newer versions, sign text is stored in SignBlockEntity front text
             // We will attempt via packet directly for reliability
@@ -268,12 +268,12 @@ public class SignInteractor {
             }
 
             if (signEntity != null) {
-                BlockPos pos = signEntity.getPos();
+                BlockPos pos = signEntity.getBlockPos();
                 mc.execute(() -> {
                     try {
-                        var packet = new net.minecraft.network.packet.c2s.play.UpdateSignC2SPacket(pos, true, line1, line2, line3, line4);
-                        if (mc.getNetworkHandler() != null) {
-                            mc.getNetworkHandler().sendPacket(packet);
+                        var packet = new net.minecraft.network.protocol.game.ServerboundSignUpdatePacket(pos, true, line1, line2, line3, line4);
+                        if (mc.getConnection() != null) {
+                            mc.getConnection().send(packet);
                         }
                     } catch (Exception ex) {
                         Logger.error("Failed to send UpdateSign packet with 4 lines", ex);
@@ -281,7 +281,7 @@ public class SignInteractor {
                 });
                 Thread.sleep(200);
                 mc.execute(() -> {
-                    if (mc.currentScreen != null) mc.setScreen(null);
+                    if (mc.screen != null) mc.setScreen(null);
                 });
                 return true;
             }
@@ -301,8 +301,8 @@ public class SignInteractor {
     }
 
     private boolean setSignLinesGeneric(String l1, String l2, String l3, String l4) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        Screen screen = mc.currentScreen;
+        Minecraft mc = Minecraft.getInstance();
+        Screen screen = mc.screen;
         if (screen == null) return false;
         try {
             java.lang.reflect.Field[] fields = screen.getClass().getDeclaredFields();
@@ -316,21 +316,21 @@ public class SignInteractor {
                 }
             }
             if (signEntity != null) {
-                BlockPos pos = signEntity.getPos();
+                BlockPos pos = signEntity.getBlockPos();
                 String ll1 = l1 != null ? l1 : "";
                 String ll2 = l2 != null ? l2 : "";
                 String ll3 = l3 != null ? l3 : "";
                 String ll4 = l4 != null ? l4 : "";
                 mc.execute(() -> {
                     try {
-                        var packet = new net.minecraft.network.packet.c2s.play.UpdateSignC2SPacket(pos, true, ll1, ll2, ll3, ll4);
-                        if (mc.getNetworkHandler() != null) mc.getNetworkHandler().sendPacket(packet);
+                        var packet = new net.minecraft.network.protocol.game.ServerboundSignUpdatePacket(pos, true, ll1, ll2, ll3, ll4);
+                        if (mc.getConnection() != null) mc.getConnection().send(packet);
                     } catch (Exception ex) {
                         Logger.error("Failed to send sign packet generic", ex);
                     }
                 });
                 Thread.sleep(200);
-                mc.execute(() -> { if (mc.currentScreen != null) mc.setScreen(null); });
+                mc.execute(() -> { if (mc.screen != null) mc.setScreen(null); });
                 return true;
             }
         } catch (Exception e) {

@@ -99,7 +99,7 @@ public class FlipEngine {
         this.sessionStateManager = sessionStateManager;
         this.breakScheduler = breakScheduler;
         this.locationValidator = locationValidator;
-        this.worldStateRecovery = worldStateRecovery;
+        this.levelStateRecovery = worldStateRecovery;
         this.packetRateLimiter = packetRateLimiter;
         this.commandQueue = commandQueue;
         this.watchdog = watchdog;
@@ -581,9 +581,9 @@ public class FlipEngine {
             }
 
             // Close GUI after cleanup
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
             mc.execute(() -> {
-                if (mc.currentScreen != null) mc.setScreen(null);
+                if (mc.screen != null) mc.setScreen(null);
             });
 
         } catch (Exception e) {

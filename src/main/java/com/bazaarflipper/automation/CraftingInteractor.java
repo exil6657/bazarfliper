@@ -4,9 +4,9 @@ import com.bazaarflipper.config.PlayerCapabilityConfig;
 import com.bazaarflipper.data.CraftingRecipes;
 import com.bazaarflipper.engine.GuiWatchdog;
 import com.bazaarflipper.util.Logger;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
-import net.minecraft.screen.slot.Slot;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
+import net.minecraft.world.inventory.Slot;
 
 /**
  * Critical: Hypixel custom crafting GUI via /craft, not vanilla.
@@ -53,8 +53,8 @@ public class CraftingInteractor {
         watchdog.notifyGuiOpened("Craft Item");
 
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (!(mc.currentScreen instanceof GenericContainerScreen craftScreen)) return false;
+            Minecraft mc = Minecraft.getInstance();
+            if (!(mc.screen instanceof ContainerScreen craftScreen)) return false;
 
             if (canUseQuickCraft()) {
                 // Quick craft if rank: find option, set quantity, confirm
@@ -62,7 +62,7 @@ public class CraftingInteractor {
                     clickSimulator.clickSlotByDisplayName(craftScreen, recipeId.replace('_', ' '));
                     Thread.sleep(delayManager.getDelay(DelayManager.DelayType.CRAFT_INTERACTION));
                     // If quantity selector appears, set
-                    if (mc.currentScreen instanceof GenericContainerScreen qtyScreen) {
+                    if (mc.screen instanceof ContainerScreen qtyScreen) {
                         // Click confirm or set quantity
                         clickSimulator.clickSlotByDisplayName(qtyScreen, "Craft");
                         Thread.sleep(delayManager.getDelay(DelayManager.DelayType.CLICK));
@@ -90,16 +90,16 @@ public class CraftingInteractor {
             return false;
         } finally {
             watchdog.notifyGuiClosed();
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.currentScreen != null) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.screen != null) {
                 mc.execute(() -> mc.setScreen(null));
             }
         }
     }
 
     public void placeIngredient(int gridSlot, String itemId, int quantity) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.currentScreen instanceof GenericContainerScreen screen) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof ContainerScreen screen) {
             // Find item in inventory matching itemId
             // Then click to move to grid
             // Placeholder: search by name
@@ -109,30 +109,30 @@ public class CraftingInteractor {
     }
 
     public void clickOutputSlot() {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.currentScreen instanceof GenericContainerScreen screen) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof ContainerScreen screen) {
             // Output slot typically has result item display name? Detection by position? But per spec never hardcoded indices - detection by presence of output?
             // Simplistic: find slot with output item maybe distinguished by being in result position but we try name detection
             // We'll look for slot that is result - but for spec compliance we note detection by name/lore
             // Placeholder: click slot with "Craft" or result
-            for (Slot slot : screen.getScreenHandler().slots) {
-                if (slot.getStack().isEmpty()) continue;
+            for (Slot slot : screen.getMenu().slots) {
+                if (slot.getItem().isEmpty()) continue;
                 // Heuristic: output slot is usually isolated
                 // For now click first non-empty
-                clickSimulator.clickSlot(screen.getScreenHandler().syncId, slot.id, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                clickSimulator.clickSlot(screen.getMenu().containerId, slot.index, 0, net.minecraft.world.inventory.ClickType.PICKUP);
                 break;
             }
         }
     }
 
-    public java.util.Map<Integer, String> detectCraftingGuiSlots(GenericContainerScreen screen) {
+    public java.util.Map<Integer, String> detectCraftingGuiSlots(ContainerScreen screen) {
         // Dynamic detection, cached
         java.util.Map<Integer, String> slotMap = new java.util.HashMap<>();
-        var handler = screen.getScreenHandler();
+        var handler = screen.getMenu();
         for (Slot slot : handler.slots) {
-            if (slot.getStack().isEmpty()) continue;
-            String name = slot.getStack().getName().getString();
-            slotMap.put(slot.id, name);
+            if (slot.getItem().isEmpty()) continue;
+            String name = slot.getItem().getHoverName().getString();
+            slotMap.put(slot.index, name);
         }
         return slotMap;
     }
@@ -147,9 +147,9 @@ public class CraftingInteractor {
         long timeout = 5000 + 100*3;
         timeout = Math.min(Math.max(timeout, 3000), 15000);
         while (System.currentTimeMillis() - start < timeout) {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.currentScreen != null) {
-                String title = mc.currentScreen.getTitle().getString();
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.screen != null) {
+                String title = mc.screen.getTitle().getString();
                 if (title.toLowerCase().contains(contains.toLowerCase())) return true;
             }
             try { Thread.sleep(50); } catch (InterruptedException e) { return false; }

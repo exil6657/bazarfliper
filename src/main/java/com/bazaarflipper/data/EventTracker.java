@@ -119,15 +119,9 @@ public class EventTracker {
         try {
             // Scoreboard sidebar parsing - look for known event keywords
             // This is tertiary fallback
-            // We would need MinecraftClient instance - try to parse scoreboard
-            var mc = net.minecraft.client.MinecraftClient.getInstance();
-            if (mc.world == null) return found;
-            var scoreboard = mc.world.getScoreboard();
-            var objective = scoreboard.getObjectiveForSlot(net.minecraft.scoreboard.ScoreboardDisplaySlot.SIDEBAR);
-            if (objective == null) return found;
-            for (var score : scoreboard.getAllPlayerScores(objective)) {
-                if (score.getPlayerName() == null) continue;
-                String line = ChatUtils.stripColorCodes(score.getPlayerName().getString()).toLowerCase();
+            // We would need Minecraft instance - try to parse scoreboard
+            for (String rawLine : ChatUtils.getSidebarLines()) {
+                String line = ChatUtils.stripColorCodes(rawLine).toLowerCase();
                 if (line.contains("spooky")) found.add("spooky_festival");
                 if (line.contains("jerry")) found.add("jerry_workshop");
                 if (line.contains("zoo")) found.add("traveling_zoo");

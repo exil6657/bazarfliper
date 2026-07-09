@@ -4,7 +4,7 @@ import com.bazaarflipper.config.ModConfig;
 import com.bazaarflipper.discord.DiscordEventHandler;
 import com.bazaarflipper.ui.ToastNotification;
 import com.bazaarflipper.util.Logger;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 /**
  * Manages private locking PIN - ensures only authorized people can use mod
@@ -110,7 +110,7 @@ public class LockManager {
             lockConfig.unlockedAt = System.currentTimeMillis();
             Logger.info("Lock enabled (PIN-only, stay-unlocked-till-manual-lock per user pref) - mod stays unlocked until manually locked via Security tab. Credits: Cldz");
             // Optional toast for info but not warning, since convenient mode
-            MinecraftClient mc = MinecraftClient.getInstance();
+            Minecraft mc = Minecraft.getInstance();
             if (mc != null) {
                 mc.execute(() -> {
                     ToastNotification.show("Security: PIN lock enabled (stay unlocked till manual lock) - Credits: Cldz", ToastNotification.ToastType.INFO);

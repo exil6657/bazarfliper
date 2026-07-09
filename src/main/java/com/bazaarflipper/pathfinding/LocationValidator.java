@@ -2,10 +2,9 @@ package com.bazaarflipper.pathfinding;
 
 import com.bazaarflipper.util.ChatUtils;
 import com.bazaarflipper.util.Logger;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.scoreboard.*;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Collection;
 
@@ -39,8 +38,8 @@ public class LocationValidator {
 
     public WorldState refreshWorldState() {
         tickCounter++;
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.getNetworkHandler() == null || mc.player == null) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.getConnection() == null || mc.player == null) {
             cachedState = WorldState.DISCONNECTED;
             lastRefresh = System.currentTimeMillis();
             return cachedState;
@@ -48,8 +47,8 @@ public class LocationValidator {
 
         String serverAddress = "";
         try {
-            if (mc.getCurrentServerEntry() != null) {
-                serverAddress = mc.getCurrentServerEntry().address;
+            if (mc.getCurrentServer() != null) {
+                serverAddress = mc.getCurrentServer().ip;
             }
         } catch (Exception ignored) {}
 
@@ -120,12 +119,12 @@ public class LocationValidator {
     private boolean isHypixelFromScoreboardOrTab() {
         // Try to detect hypixel from tab list or scoreboard if server address not available
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.getNetworkHandler() == null) return false;
-            Collection<PlayerListEntry> entries = mc.getNetworkHandler().getPlayerList();
-            for (PlayerListEntry e : entries) {
-                if (e.getDisplayName() != null) {
-                    String n = ChatUtils.stripColorCodes(e.getDisplayName().getString()).toLowerCase();
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.getConnection() == null) return false;
+            Collection<PlayerInfo> entries = mc.getConnection().getOnlinePlayers();
+            for (PlayerInfo e : entries) {
+                if (e.getTabListDisplayName() != null) {
+                    String n = ChatUtils.stripColorCodes(e.getTabListDisplayName().getString()).toLowerCase();
                     if (n.contains("hypixel")) return true;
                 }
             }
@@ -135,15 +134,9 @@ public class LocationValidator {
 
     private String getSidebarStripped() {
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.world == null) return "";
-            Scoreboard scoreboard = mc.world.getScoreboard();
-            ScoreboardObjective objective = scoreboard.getObjectiveForSlot(ScoreboardDisplaySlot.SIDEBAR);
-            if (objective == null) return "";
             StringBuilder sb = new StringBuilder();
-            for (ScoreboardScore score : scoreboard.getAllPlayerScores(objective)) {
-                String name = score.getPlayerName() != null ? ChatUtils.stripColorCodes(score.getPlayerName().getString()) : "";
-                sb.append(name).append("\n");
+            for (String name : ChatUtils.getSidebarLines()) {
+                sb.append(ChatUtils.stripColorCodes(name)).append("\n");
             }
             return sb.toString();
         } catch (Exception e) {
@@ -171,9 +164,9 @@ public class LocationValidator {
 
     public boolean isOnHypixel() {
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.getCurrentServerEntry() != null) {
-                return mc.getCurrentServerEntry().address.contains("hypixel.net");
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.getCurrentServer() != null) {
+                return mc.getCurrentServer().ip.contains("hypixel.net");
             }
             return isHypixelFromScoreboardOrTab();
         } catch (Exception e) {
@@ -190,7 +183,7 @@ public class LocationValidator {
         return getCurrentWorldState() == WorldState.SKYBLOCK_HUB;
     }
 
-    public boolean isNearWaypoint(String waypointName, Vec3d pos) {
+    public boolean isNearWaypoint(String waypointName, Vec3 pos) {
         // Would use WaypointRegistry, but for validator we need registry instance - placeholder returns false
         return false;
     }

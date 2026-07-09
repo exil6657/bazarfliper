@@ -169,7 +169,7 @@ public class WaypointRegistry {
         return waypoints.get(name);
     }
 
-    public Waypoint getNearestWaypoint(String category, net.minecraft.util.math.Vec3d pos) {
+    public Waypoint getNearestWaypoint(String category, net.minecraft.world.phys.Vec3 pos) {
         Waypoint nearest = null;
         double bestDist = Double.MAX_VALUE;
         for (Waypoint wp : waypoints.values()) {
@@ -186,7 +186,7 @@ public class WaypointRegistry {
         return nearest;
     }
 
-    public boolean isPlayerAtWaypoint(String name, net.minecraft.util.math.Vec3d pos) {
+    public boolean isPlayerAtWaypoint(String name, net.minecraft.world.phys.Vec3 pos) {
         Waypoint wp = getWaypoint(name);
         if (wp == null) return false;
         double dx = wp.x - pos.x;

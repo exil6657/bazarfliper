@@ -7,8 +7,8 @@ import com.bazaarflipper.mayor.MayorData;
 import com.bazaarflipper.mayor.MayorTracker;
 import com.bazaarflipper.util.ColorUtils;
 import com.bazaarflipper.util.MathUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +28,8 @@ public class ActiveFlipsWidget {
         this.mayorTracker = mayorTracker;
     }
 
-    public void render(DrawContext context, int x, int y, int width, int height) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+    public void render(GuiGraphics context, int x, int y, int width, int height) {
+        Minecraft mc = Minecraft.getInstance();
         // Border accent: green if session profit positive, red if negative per spec
         // We don't have ProfitTracker here but we can infer from estimated profits? For now use positive green default, will be overridden by actual profit logic in HudOverlay if needed
         // Background with border accent based on last rendered profit sign - simplified green if any profitable flips
@@ -50,7 +50,7 @@ public class ActiveFlipsWidget {
         Map<String, ActiveFlip> flips = flipEngine.getActiveFlips();
         if (flips.isEmpty()) {
             String msg = flipEngine.getState().name().contains("BREAK") ? "No active flips — on break" : "No active flips — scanning...";
-            context.drawText(mc.textRenderer, msg, x+5, y+5, ColorUtils.SECONDARY_TEXT, false);
+            context.drawString(mc.font, msg, x+5, y+5, ColorUtils.SECONDARY_TEXT, false);
             return;
         }
 
@@ -72,16 +72,16 @@ public class ActiveFlipsWidget {
             // Item display name truncated
             String displayName = flip.productId;
             if (displayName.length() > 18) displayName = displayName.substring(0,15)+"...";
-            context.drawText(mc.textRenderer, displayName, x+5, rowY+5, ColorUtils.ITEM_NAME, false);
+            context.drawString(mc.font, displayName, x+5, rowY+5, ColorUtils.ITEM_NAME, false);
 
             // State dot
             int dotColor = getDotColorForState(flip.state);
-            context.drawText(mc.textRenderer, "●", x+80, rowY+5, dotColor, false);
+            context.drawString(mc.font, "●", x+80, rowY+5, dotColor, false);
 
             // Buy/Sell/Qty
-            context.drawText(mc.textRenderer, MathUtils.formatCoins(flip.buyPrice), x+90, rowY+5, ColorUtils.PRIMARY_TEXT, false);
-            context.drawText(mc.textRenderer, MathUtils.formatCoins(flip.targetSellPrice), x+130, rowY+5, ColorUtils.PRIMARY_TEXT, false);
-            context.drawText(mc.textRenderer, String.valueOf(flip.quantity), x+170, rowY+5, ColorUtils.SECONDARY_TEXT, false);
+            context.drawString(mc.font, MathUtils.formatCoins(flip.buyPrice), x+90, rowY+5, ColorUtils.PRIMARY_TEXT, false);
+            context.drawString(mc.font, MathUtils.formatCoins(flip.targetSellPrice), x+130, rowY+5, ColorUtils.PRIMARY_TEXT, false);
+            context.drawString(mc.font, String.valueOf(flip.quantity), x+170, rowY+5, ColorUtils.SECONDARY_TEXT, false);
 
             // Estimated profit live recalculated using correct tax
             double estProfit = 0;
@@ -92,7 +92,7 @@ public class ActiveFlipsWidget {
                 estProfit = taxCalculator.calculateBazaarProfit(flip.buyPrice, flip.targetSellPrice) * flip.quantity;
             }
             int profitColor = estProfit>=0 ? ColorUtils.PROFIT_POSITIVE : ColorUtils.PROFIT_NEGATIVE;
-            context.drawText(mc.textRenderer, MathUtils.formatCoins(estProfit), x+190, rowY+5, profitColor, false);
+            context.drawString(mc.font, MathUtils.formatCoins(estProfit), x+190, rowY+5, profitColor, false);
 
             // Fill progress bar
             int barX = x+90;
@@ -106,11 +106,11 @@ public class ActiveFlipsWidget {
 
             // Time since order
             long age = System.currentTimeMillis() - flip.placementTimestamp;
-            context.drawText(mc.textRenderer, formatDuration(age), x+160, rowY+15, ColorUtils.SECONDARY_TEXT, false);
+            context.drawString(mc.font, formatDuration(age), x+160, rowY+15, ColorUtils.SECONDARY_TEXT, false);
 
             // Relist count
             if (flip.relistCount>0) {
-                context.drawText(mc.textRenderer, "↺"+flip.relistCount, x+5, rowY+15, ColorUtils.WARNING, false);
+                context.drawString(mc.font, "↺"+flip.relistCount, x+5, rowY+15, ColorUtils.WARNING, false);
             }
 
             // Strategy badge
@@ -121,14 +121,14 @@ public class ActiveFlipsWidget {
                 case "AH_CRAFT" -> "[AH]";
                 default -> "[?]";
             };
-            context.drawText(mc.textRenderer, badge, x+220, rowY+5, ColorUtils.SECONDARY_TEXT, false);
+            context.drawString(mc.font, badge, x+220, rowY+5, ColorUtils.SECONDARY_TEXT, false);
 
             // For AH flips: small tax tier badge [1%], [2%], [2.5%] etc
             if ("AH_CRAFT".equals(flip.strategyType)) {
                 MayorData curMayor = mayorTracker.getCurrentMayor();
                 String tierBadge = formatTaxBadge(flip.targetSellPrice, curMayor);
                 int badgeColor = getTaxBadgeColor(flip.targetSellPrice, curMayor);
-                context.drawText(mc.textRenderer, tierBadge, x+220, rowY+15, badgeColor, false);
+                context.drawString(mc.font, tierBadge, x+220, rowY+15, badgeColor, false);
             }
         }
 

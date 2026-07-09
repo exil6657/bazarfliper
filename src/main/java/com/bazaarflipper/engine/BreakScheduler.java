@@ -4,7 +4,7 @@ import com.bazaarflipper.config.ModConfig;
 import com.bazaarflipper.pathfinding.MovementSimulator;
 import com.bazaarflipper.util.Logger;
 import com.bazaarflipper.util.MathUtils;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -201,7 +201,7 @@ public class BreakScheduler {
     private void runIdleBehavior() {
         if (!isOnBreak) return;
         long now = System.currentTimeMillis();
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
 
         if (config.breakIdleCameraMovement) {
             if (now - lastIdleCameraMove > MathUtils.randomInt(15000, 45000)) {
@@ -210,8 +210,8 @@ public class BreakScheduler {
                     float pitchChange = MathUtils.randomInt(-10, 10);
                     mc.execute(() -> {
                         if (mc.player != null) {
-                            movementSimulator.setYaw(mc.player.getYaw() + yawChange, MathUtils.randomInt(2, 5));
-                            movementSimulator.setPitch(mc.player.getPitch() + pitchChange, MathUtils.randomInt(2, 5));
+                            movementSimulator.setYRot(mc.player.getYRot() + yawChange, MathUtils.randomInt(2, 5));
+                            movementSimulator.setXRot(mc.player.getXRot() + pitchChange, MathUtils.randomInt(2, 5));
                         }
                     });
                 }

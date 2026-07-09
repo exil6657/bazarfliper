@@ -1,9 +1,9 @@
 package com.bazaarflipper.pathfinding;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,23 +16,23 @@ import java.util.List;
 public class EnvironmentalScanner {
 
     public static class InterestingPoint {
-        public Vec3d pos;
+        public Vec3 pos;
         public String type; // npc, chest, player, decoration, hazard
         public double interestScore;
-        public InterestingPoint(Vec3d pos, String type, double score) {
+        public InterestingPoint(Vec3 pos, String type, double score) {
             this.pos = pos; this.type = type; this.interestScore = score;
         }
     }
 
     public List<InterestingPoint> scanNearbyPOI(double radius) {
         List<InterestingPoint> points = new ArrayList<>();
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.world == null || mc.player == null) return points;
-        Vec3d playerPos = mc.player.getPos();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.player == null) return points;
+        Vec3 playerPos = mc.player.position();
 
-        for (Entity e : mc.world.getEntities()) {
+        for (Entity e : mc.level.entitiesForRendering()) {
             if (e == mc.player) continue;
-            double dist = e.getPos().distanceTo(playerPos);
+            double dist = e.position().distanceTo(playerPos);
             if (dist > radius) continue;
             String name = e.getName().getString().toLowerCase();
             double score = 0;
@@ -50,7 +50,7 @@ public class EnvironmentalScanner {
                 score = 2;
                 type = "mob";
             }
-            if (score > 0) points.add(new InterestingPoint(e.getPos().add(0, e.getHeight()/2, 0), type, score));
+            if (score > 0) points.add(new InterestingPoint(e.position().add(0, e.getBbHeight()/2, 0), type, score));
         }
 
         // Scan for chests, interesting blocks (could be extended to scan block entities)
@@ -61,15 +61,15 @@ public class EnvironmentalScanner {
     }
 
     public boolean isHazardNearby(BlockPos pos, double radius) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.world == null) return false;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return false;
         // Check for lava, fire, cactus within radius
         for (int dx=-(int)radius; dx<=radius; dx++) {
             for (int dy=-(int)radius; dy<=radius; dy++) {
                 for (int dz=-(int)radius; dz<=radius; dz++) {
                     BlockPos check = pos.add(dx,dy,dz);
                     try {
-                        var state = mc.world.getBlockState(check);
+                        var state = mc.level.getBlockState(check);
                         String blockId = state.getBlock().toString().toLowerCase();
                         if (blockId.contains("lava") || blockId.contains("fire") || blockId.contains("cactus") || blockId.contains("magma")) {
                             return true;
@@ -82,13 +82,13 @@ public class EnvironmentalScanner {
     }
 
     public boolean isVoidBelow(BlockPos pos, int depth) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.world == null) return false;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return false;
         for (int i=1;i<=depth;i++) {
-            BlockPos below = pos.down(i);
+            BlockPos below = pos.below(i);
             try {
-                var state = mc.world.getBlockState(below);
-                if (!state.isAir() && state.isSolidBlock(mc.world, below)) return false;
+                var state = mc.level.getBlockState(below);
+                if (!state.isAir() && state.isSolidRender(mc.level, below)) return false;
             } catch (Exception e) { return true; }
         }
         return true; // no ground found within depth -> void

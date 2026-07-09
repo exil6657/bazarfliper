@@ -1,16 +1,16 @@
 package com.bazaarflipper.ui;
 
 import com.bazaarflipper.util.ColorUtils;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.util.List;
 
 /**
- * Simple sparkline graph drawn entirely via DrawContext.fill()
+ * Simple sparkline graph drawn entirely via GuiGraphics.fill()
  */
 public class ProfitGraphWidget {
 
-    public void render(DrawContext context, int x, int y, int width, int height, List<Double> values) {
+    public void render(GuiGraphics context, int x, int y, int width, int height, List<Double> values) {
         // Background filled rectangle in dark color
         context.fill(x, y, x+width, y+height, ColorUtils.PANEL_BG);
         // Border 1px
