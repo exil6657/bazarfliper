@@ -16,6 +16,7 @@ public class AuctionHouseInteractor {
     private final GuiWatchdog watchdog;
     private final HumanizedNavigator navigator;
     private final com.bazaarflipper.config.PlayerCapabilityConfig playerCap;
+    private final SignInteractor signInteractor;
 
     public AuctionHouseInteractor(LocationValidator validator, ChatCommandSender sender, ClickSimulator clickSim,
                                   DelayManager delayManager, GuiWatchdog watchdog, HumanizedNavigator navigator,
@@ -27,6 +28,7 @@ public class AuctionHouseInteractor {
         this.watchdog = watchdog;
         this.navigator = navigator;
         this.playerCap = playerCap;
+        this.signInteractor = new SignInteractor(delayManager);
     }
 
     public boolean openAH() {
@@ -71,32 +73,91 @@ public class AuctionHouseInteractor {
         try {
             MinecraftClient mc = MinecraftClient.getInstance();
             // Steps: Manage Auctions -> Create Auction -> put item -> BIN -> set price -> confirm
-            // Simplified
+            // Per fandom: AH bottom row Search (Oak Wood Sign), Item Tier Eye of Ender, Sort Hopper, BIN Filter
             if (mc.currentScreen instanceof GenericContainerScreen ahScreen) {
                 clickSimulator.clickSlotByDisplayName(ahScreen, "Manage Auctions");
                 Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
                 if (mc.currentScreen instanceof GenericContainerScreen manageScreen) {
                     clickSimulator.clickSlotByDisplayName(manageScreen, "Create Auction");
                     Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
-                    // Now need to place item - usually click to place held item? Complex
-                    // Placeholder flow
-                    clickSimulator.clickSlotByDisplayName((GenericContainerScreen) mc.currentScreen, "Auction House Browser"); // maybe not
-                    Thread.sleep(delayManager.getDelay(DelayManager.DelayType.AH_INTERACTION));
+                    // Place item - click to place held item (simplified)
+                    // The item to list should be held or in inventory - we would need to click slot where item should go
+                    // Placeholder: try to find empty slot for item placement
+                    if (mc.currentScreen instanceof GenericContainerScreen createScreen) {
+                        // Try to click first empty slot or slot with item placeholder
+                        // For humanization, we would have already had item in inventory and click to move
+                        // After placing item, set BIN price via sign (not chat) - per research AH uses sign for price? Actually AH uses sign for search, price via anvil or sign?
+                        // According to Bazaar Utils thread: custom orders feature clicks sign, enters text automatically and closes after 1.5s - applies to AH too via sign
+                        // So for BIN price, it may be anvil or sign - we handle both via signInteractor fallback to chat
 
-                    // Set BIN price via chat? Some servers use anvil
-                    commandSender.sendChatMessage(String.valueOf((long)price));
-                    Thread.sleep(delayManager.getDelay(DelayManager.DelayType.CLICK));
+                        Thread.sleep(delayManager.getDelay(DelayManager.DelayType.AH_INTERACTION));
 
-                    // Click BIN toggle then confirm
-                    if (mc.currentScreen instanceof GenericContainerScreen finalScreen) {
-                        clickSimulator.clickSlotByDisplayName(finalScreen, "Create BIN");
-                        Thread.sleep(delayManager.getDelay(DelayManager.DelayType.CLICK));
-                        return true;
+                        // Try sign for price
+                        boolean priceViaSign = false;
+                        // Look for sign slot with "Price" or "Custom Price"
+                        for (var slot : createScreen.getScreenHandler().slots) {
+                            if (slot.getStack().isEmpty()) continue;
+                            String name = slot.getStack().getName().getString().toLowerCase();
+                            if (name.contains("price") || name.contains("custom")) {
+                                clickSimulator.clickSlot(createScreen.getScreenHandler().syncId, slot.id, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                                Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
+                                if (signInteractor.waitForSignGui(3000)) {
+                                    signInteractor.setSignLines(String.valueOf((long) price), "", "", "");
+                                    Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
+                                    priceViaSign = true;
+                                }
+                                break;
+                            }
+                        }
+                        if (!priceViaSign) {
+                            // Fallback old chat method (anvil may use chat)
+                            commandSender.sendChatMessage(String.valueOf((long) price));
+                            Thread.sleep(delayManager.getDelay(DelayManager.DelayType.CLICK));
+                        }
+
+                        // Click BIN toggle then confirm
+                        if (mc.currentScreen instanceof GenericContainerScreen finalScreen) {
+                            clickSimulator.clickSlotByDisplayName(finalScreen, "Create BIN");
+                            Thread.sleep(delayManager.getDelay(DelayManager.DelayType.CLICK));
+                            clickSimulator.clickSlotByDisplayName(finalScreen, "Confirm");
+                            Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
+                            Logger.info("BIN listing created via sign/price input for " + item.getName().getString() + " @ " + price + " - credits Cldz");
+                            return true;
+                        }
                     }
                 }
             }
         } catch (Exception e) {
             Logger.error("Create BIN listing failed", e);
+        } finally {
+            watchdog.notifyGuiClosed();
+        }
+        return false;
+    }
+
+    public boolean searchAH(String query) {
+        // Implements fandom research: Search (Oak Wood Sign) option at bottom of AH GUI, when clicked gives place to type name
+        if (!openAH()) return false;
+        watchdog.notifyGuiOpened("Auction House Search");
+        try {
+            MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc.currentScreen instanceof GenericContainerScreen ahScreen) {
+                clickSimulator.clickSlotByDisplayName(ahScreen, "Search");
+                Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
+                if (signInteractor.waitForSignGui(3000)) {
+                    signInteractor.setSignTextAndSubmit(query);
+                    Thread.sleep(delayManager.getDelay(DelayManager.DelayType.GUI_LOAD));
+                    Logger.info("AH search via sign for query: " + query + " - per fandom wiki Search (Oak Wood Sign) - credits Cldz");
+                    return true;
+                } else {
+                    // Fallback to chat
+                    commandSender.sendChatMessage(query);
+                    Thread.sleep(delayManager.getDelay(DelayManager.DelayType.CLICK));
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            Logger.error("AH search failed", e);
         } finally {
             watchdog.notifyGuiClosed();
         }

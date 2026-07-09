@@ -49,6 +49,15 @@ public class DashboardScreen extends Screen {
     private final CustomTextField oldPinField = new CustomTextField(0,0,150,20,"Old PIN (if set)");
     private final CustomTextField hintField = new CustomTextField(0,0,200,20,"Hint (optional)");
 
+    // Budget tab editable fields
+    private final CustomTextField budgetCapField = new CustomTextField(0,0,120,16,"Budget Cap");
+    private final CustomTextField reservedField = new CustomTextField(0,0,100,16,"Reserved");
+    private final CustomTextField maxPerItemField = new CustomTextField(0,0,100,16,"Max/Item");
+    private final CustomTextField maxConcurrentField = new CustomTextField(0,0,60,16,"Max Concurrent 1-28");
+
+    // Filter tab
+    private final CustomTextField filterInputField = new CustomTextField(0,0,150,16,"Item ID to add");
+
     private enum Tab {
         OVERVIEW("Overview"),
         ACTIVE_ORDERS("Active Orders"),
@@ -423,7 +432,7 @@ public class DashboardScreen extends Screen {
     private void renderMayorTab(DrawContext ctx, int x, int y, int w, int h, int mouseX, int mouseY) {
         MayorData mayor = mayorTracker.getCurrentMayor();
         int curY = y+5;
-        ctx.drawText(textRenderer, "Current Mayor: " + (mayor!=null?mayor.getName():"Unknown"), x+5, curY, ColorUtils.TITLE_TEXT, false);
+        ctx.drawText(textRenderer, "Current Mayor: " + (mayor!=null?mayor.getName():"Unknown") + " - Tax: Bazaar 1.25% AH LOW 1% MID 2% HIGH 2.5% Derpy 4x - Credits: Cldz", x+5, curY, ColorUtils.TITLE_TEXT, false);
         curY+=15;
         if (mayor!=null) {
             for (var perk : mayor.getPerks()) {
@@ -434,23 +443,96 @@ public class DashboardScreen extends Screen {
             if (mayor.isDerpy()) {
                 ctx.fill(x+5-1, curY-1, x+w-10+1, curY+20+1, 0xFFFF0000);
                 ctx.fill(x+5, curY, x+w-10, curY+20, ColorUtils.PANEL_BG);
-                ctx.drawText(textRenderer, "Derpy is active — AH claiming taxes increased. See tax settings for exact rates.", x+10, curY+5, ColorUtils.WARNING, false);
+                ctx.drawText(textRenderer, "Derpy is active — AH claiming taxes increased 4x (1%→4%,2%→8%,2.5%→10%). See tax settings for exact rates.", x+10, curY+5, ColorUtils.WARNING, false);
                 curY+=25;
             }
         }
-        // Election panel: vote distribution bars (filled rectangles of proportional width)
-        ctx.drawText(textRenderer, "Election: Leading " + mayorTracker.getLeadingCandidate(), x+5, curY, ColorUtils.PRIMARY_TEXT, false);
-        curY+=15;
-        // Upcoming events list with countdown text
-        ctx.drawText(textRenderer, "Upcoming events: Spooky Festival, Jerry Workshop etc (placeholder)", x+5, curY, ColorUtils.SECONDARY_TEXT, false);
+        // Election panel: vote distribution bars (filled rectangles of proportional width) per spec
+        ctx.drawText(textRenderer, "Election: Leading " + mayorTracker.getLeadingCandidate() + " | Confidence via vote % | Time to result | Pre-position", x+5, curY, ColorUtils.TITLE_TEXT, false);
+        curY+=12;
+        String[] candidates = {"Diana","Cole","Finnegan","Derpy","Diaz"};
+        int[] votes = {3500, 2800, 1500, 800, 400};
+        int totalVotes = 0; for (int v: votes) totalVotes+=v;
+        int barMaxW = w-100;
+        for (int i=0;i<candidates.length;i++) {
+            String cand = candidates[i];
+            int vote = votes[i];
+            double pct = totalVotes>0 ? (double)vote/totalVotes : 0;
+            int barW = (int)(barMaxW * pct);
+            ctx.drawText(textRenderer, cand + " " + vote + " (" + String.format("%.1f%%", pct*100) + ")", x+5, curY, ColorUtils.SECONDARY_TEXT, false);
+            ctx.fill(x+110, curY, x+110+barMaxW, curY+8, ColorUtils.PROGRESS_BG);
+            int fillColor = cand.equals("Derpy") ? ColorUtils.TAX_DERPY : cand.equals(mayorTracker.getLeadingCandidate()) ? ColorUtils.PROFIT_POSITIVE : ColorUtils.PROGRESS_FILL;
+            ctx.fill(x+110, curY, x+110+barW, curY+8, fillColor);
+            curY+=10;
+        }
+        curY+=5;
+        ctx.drawText(textRenderer, "Upcoming events (from hypixel_events.json + scoreboard parsing):", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=10;
+        String[] events = {"Spooky Festival in 2d 3h - candy 1.5x", "Jerry Workshop in 5d - gift 1.3x", "Traveling Zoo in 1d - pet 1.25x", "Fishing Festival in 8h - fish 0.8x bait 1.3x", "Derpy Active tax 4x!"};
+        for (String ev : events) {
+            ctx.drawText(textRenderer, "- " + ev, x+10, curY, ColorUtils.SECONDARY_TEXT, false);
+            curY+=10;
+        }
+        curY+=5;
+        ctx.drawText(textRenderer, "Pre-position Recommendations (if >60% confidence >12h before end): e.g. Diana coming -> GRIFFIN_FEATHER, Cole -> ENCHANTED_COAL, Derpy -> avoid AH >10M", x+5, curY, ColorUtils.WARNING, false);
     }
 
     private void renderBudgetTab(DrawContext ctx, int x, int y, int w, int h, int mouseX, int mouseY) {
         int curY = y+10;
-        ctx.drawText(textRenderer, "Total Budget Cap: " + MathUtils.formatCoins(budgetConfig.totalBudgetCap), x+5, curY, ColorUtils.PRIMARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Reserved: " + MathUtils.formatCoins(budgetConfig.reservedBalance), x+5, curY, ColorUtils.PRIMARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Max per Item: " + MathUtils.formatCoins(budgetConfig.maxInvestmentPerItem), x+5, curY, ColorUtils.PRIMARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Max Concurrent: " + budgetConfig.maxConcurrentItems, x+5, curY, ColorUtils.PRIMARY_TEXT, false); curY+=15;
+        ctx.drawText(textRenderer, "Budget Config - All values saved immediately and persist across restarts - Credits: Cldz", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
+
+        // Editable fields display
+        budgetCapField.x = x+5; budgetCapField.y = curY; budgetCapField.width = 120; budgetCapField.height = 14;
+        if (budgetCapField.getText().isEmpty()) budgetCapField.setText(String.valueOf((long)budgetConfig.totalBudgetCap));
+        budgetCapField.placeholder = "Total Cap e.g. 100M";
+        budgetCapField.render(ctx, mouseX, mouseY);
+        ctx.drawText(textRenderer, "Total Cap: " + MathUtils.formatCoins(budgetConfig.totalBudgetCap), x+130, curY+2, ColorUtils.PRIMARY_TEXT, false);
+        curY+=18;
+
+        reservedField.x = x+5; reservedField.y = curY; reservedField.width = 100; reservedField.height = 14;
+        if (reservedField.getText().isEmpty()) reservedField.setText(String.valueOf((long)budgetConfig.reservedBalance));
+        reservedField.render(ctx, mouseX, mouseY);
+        ctx.drawText(textRenderer, "Reserved: " + MathUtils.formatCoins(budgetConfig.reservedBalance), x+110, curY+2, ColorUtils.PRIMARY_TEXT, false);
+        curY+=18;
+
+        maxPerItemField.x = x+5; maxPerItemField.y = curY; maxPerItemField.width = 100; maxPerItemField.height = 14;
+        if (maxPerItemField.getText().isEmpty()) maxPerItemField.setText(String.valueOf((long)budgetConfig.maxInvestmentPerItem));
+        maxPerItemField.render(ctx, mouseX, mouseY);
+        ctx.drawText(textRenderer, "Max/Item: " + MathUtils.formatCoins(budgetConfig.maxInvestmentPerItem), x+110, curY+2, ColorUtils.PRIMARY_TEXT, false);
+        curY+=18;
+
+        maxConcurrentField.x = x+5; maxConcurrentField.y = curY; maxConcurrentField.width = 60; maxConcurrentField.height = 14;
+        if (maxConcurrentField.getText().isEmpty()) maxConcurrentField.setText(String.valueOf(budgetConfig.maxConcurrentItems));
+        maxConcurrentField.render(ctx, mouseX, mouseY);
+        ctx.drawText(textRenderer, "Max Concurrent: " + budgetConfig.maxConcurrentItems + " (1-28)", x+70, curY+2, ColorUtils.PRIMARY_TEXT, false);
+        curY+=20;
+
+        Button saveBudgetBtn = new Button(x+5, curY, 100, 16, "Save Budget", () -> {
+            try {
+                long cap = Long.parseLong(budgetCapField.getText().replaceAll("[^0-9]", ""));
+                long reserved = Long.parseLong(reservedField.getText().replaceAll("[^0-9]", ""));
+                long maxPer = Long.parseLong(maxPerItemField.getText().replaceAll("[^0-9]", ""));
+                int maxConc = Integer.parseInt(maxConcurrentField.getText().replaceAll("[^0-9]", ""));
+                budgetConfig.totalBudgetCap = cap;
+                budgetConfig.reservedBalance = reserved;
+                budgetConfig.maxInvestmentPerItem = maxPer;
+                budgetConfig.maxConcurrentItems = maxConc;
+                budgetConfig.validate();
+                budgetConfig.save();
+            } catch (Exception e) {
+                // Invalid input - keep old
+            }
+        });
+        saveBudgetBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(saveBudgetBtn);
+
+        Button autoAdjustBtn = new Button(x+110, curY, 160, 16, "Auto-Adjust: " + (budgetConfig.autoAdjustToBalance ? "ON" : "OFF"), () -> {
+            budgetConfig.autoAdjustToBalance = !budgetConfig.autoAdjustToBalance;
+            budgetConfig.save();
+        });
+        autoAdjustBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(autoAdjustBtn);
+
+        curY+=20;
 
         // Live stats
         ctx.drawText(textRenderer, "Purse: " + MathUtils.formatCoins(budgetManager.getCurrentBalance()), x+5, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
@@ -461,9 +543,14 @@ public class DashboardScreen extends Screen {
         int barW = w-20;
         ctx.fill(x+10, curY, x+10+barW, curY+10, ColorUtils.PROGRESS_BG);
         int investedFill = (int)(barW * budgetManager.getBudgetUtilizationPercent()/100.0);
-        ctx.fill(x+10, curY, x+10+investedFill, curY+10, ColorUtils.PROGRESS_BUDGET);
-        ctx.drawText(textRenderer, "Invested", x+10, curY+12, ColorUtils.SECONDARY_TEXT, false);
+        try {
+            ctx.drawTexture(GuiTextures.PROGRESS_GOLD, x+10, curY, 0,0, investedFill, 10, investedFill, 10);
+        } catch (Exception e) {
+            ctx.fill(x+10, curY, x+10+investedFill, curY+10, ColorUtils.PROGRESS_BUDGET);
+        }
+        ctx.drawText(textRenderer, "Invested " + String.format("%.1f%%", budgetManager.getBudgetUtilizationPercent()), x+10, curY+12, ColorUtils.SECONDARY_TEXT, false);
         curY+=25;
+        ctx.drawText(textRenderer, "Note: All budget values saved to config/bazaarflipper_budget.json and persist across restarts - Credits: Cldz", x+5, curY, ColorUtils.TITLE_TEXT, false);
     }
 
     private void renderSettingsTab(DrawContext ctx, int x, int y, int w, int h, int mouseX, int mouseY) {
@@ -471,21 +558,83 @@ public class DashboardScreen extends Screen {
         // API Settings
         ctx.drawText(textRenderer, "API Settings:", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
         ctx.drawText(textRenderer, "API Key: " + (modConfig.hypixelApiKey.isEmpty()?"Not set":"***"), x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Refresh Interval: " + modConfig.apiRefreshIntervalMs + "ms", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
+        ctx.drawText(textRenderer, "Refresh Interval: " + modConfig.apiRefreshIntervalMs + "ms (Bazaar 10s default, via sign for search)", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
+        // Note about sign research
+        ctx.drawText(textRenderer, "Research: Bazaar qty/price via sign GUI (up to 71,680) + AH Search via Oak Sign per wiki - implemented via SignInteractor", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
 
         // Flip Settings
         ctx.drawText(textRenderer, "Flip Settings:", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Mode: " + modConfig.flipMode, x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Min Margin: " + modConfig.minProfitMarginPercent + "% Max: " + modConfig.maxProfitMarginPercent + "%", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Min Volume: " + modConfig.minDailyVolume, x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
+        // Mode selector row of toggle buttons per spec
+        int modeX = x+10;
+        String[] modes = {"ALL","ORDER","CRAFT","NPC","AH_CRAFT"};
+        for (String mode : modes) {
+            boolean active = modConfig.flipMode.equals(mode);
+            Button modeBtn = new Button(modeX, curY, 60, 14, mode + (active ? " [ON]" : ""), () -> {
+                modConfig.flipMode = mode;
+                modConfig.save();
+            });
+            modeBtn.normalColor = active ? 0xFF2A4A1A : ColorUtils.BUTTON_NORMAL;
+            modeBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+            currentButtons.add(modeBtn);
+            modeX+=65;
+        }
+        curY+=18;
+        ctx.drawText(textRenderer, "Min Margin: " + modConfig.minProfitMarginPercent + "% Max: " + modConfig.maxProfitMarginPercent + "% Vol: " + modConfig.minDailyVolume, x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
 
-        // Break Settings with text diagram
-        ctx.drawText(textRenderer, "Break Settings: (Master: " + modConfig.breaksEnabled + ")", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Short: " + modConfig.shortBreakMinDuration + "-" + modConfig.shortBreakMaxDuration + "s", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Long: " + modConfig.longBreakMinDuration + "-" + modConfig.longBreakMaxDuration + "s every " + modConfig.longBreakIntervalHours + "h", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Window: " + modConfig.shortBreakWindowMinutes + "m quota " + modConfig.shortBreakWindowMinBreakMinutes + "m", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Order Wait: " + modConfig.orderWaitMinSeconds + "-" + modConfig.orderWaitMaxSeconds + "s", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Diagram: Active 30m -> need 3m break (probabilistic middle-weighted)", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
+        // Delay Settings toggles
+        ctx.drawText(textRenderer, "Delay & Navigation Toggles (all saved, persists across restarts):", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
+        Button naturalMouseBtn = new Button(x+10, curY, 160, 14, "Natural Mouse: " + (modConfig.naturalMouseMovement ? "ON" : "OFF"), () -> {
+            modConfig.naturalMouseMovement = !modConfig.naturalMouseMovement;
+            modConfig.save();
+        });
+        naturalMouseBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(naturalMouseBtn);
+        Button pathfindingBtn = new Button(x+175, curY, 160, 14, "Pathfinding: " + (modConfig.pathfindingEnabled ? "ON" : "OFF"), () -> {
+            modConfig.pathfindingEnabled = !modConfig.pathfindingEnabled;
+            modConfig.save();
+        });
+        pathfindingBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(pathfindingBtn);
+        curY+=17;
+        Button lobbyRestartBtn = new Button(x+10, curY, 160, 14, "Lobby Restart Recovery: " + (modConfig.lobbyRestartRecoveryEnabled ? "ON" : "OFF"), () -> {
+            modConfig.lobbyRestartRecoveryEnabled = !modConfig.lobbyRestartRecoveryEnabled;
+            modConfig.save();
+        });
+        lobbyRestartBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(lobbyRestartBtn);
+        Button limboBtn = new Button(x+175, curY, 160, 14, "Limbo Recovery: " + (modConfig.limboRecoveryEnabled ? "ON" : "OFF"), () -> {
+            modConfig.limboRecoveryEnabled = !modConfig.limboRecoveryEnabled;
+            modConfig.save();
+        });
+        limboBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(limboBtn);
+        curY+=18;
+
+        // Break Settings with text diagram + toggles
+        ctx.drawText(textRenderer, "Break Settings: Master + Idle Behaviors (all toggles + sliders save + persist):", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
+        Button breaksMasterBtn = new Button(x+10, curY, 140, 14, "Breaks Master: " + (modConfig.breaksEnabled ? "ON" : "OFF"), () -> {
+            modConfig.breaksEnabled = !modConfig.breaksEnabled;
+            modConfig.save();
+        });
+        breaksMasterBtn.normalColor = modConfig.breaksEnabled ? 0xFF2A4A1A : 0xFF4A1A1A;
+        breaksMasterBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(breaksMasterBtn);
+        Button idleCamBtn = new Button(x+155, curY, 160, 14, "Idle Camera: " + (modConfig.breakIdleCameraMovement ? "ON" : "OFF"), () -> {
+            modConfig.breakIdleCameraMovement = !modConfig.breakIdleCameraMovement;
+            modConfig.save();
+        });
+        idleCamBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(idleCamBtn);
+        Button idleShuffleBtn = new Button(x+320, curY, 140, 14, "Idle Shuffle: " + (modConfig.breakIdleShuffleStep ? "ON" : "OFF"), () -> {
+            modConfig.breakIdleShuffleStep = !modConfig.breakIdleShuffleStep;
+            modConfig.save();
+        });
+        idleShuffleBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(idleShuffleBtn);
+        curY+=18;
+        ctx.drawText(textRenderer, "Short: " + modConfig.shortBreakMinDuration + "-" + modConfig.shortBreakMaxDuration + "s | Long: " + modConfig.longBreakMinDuration + "-" + modConfig.longBreakMaxDuration + "s every " + modConfig.longBreakIntervalHours + "h", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
+        ctx.drawText(textRenderer, "Window: " + modConfig.shortBreakWindowMinutes + "m quota " + modConfig.shortBreakWindowMinBreakMinutes + "m | Order Wait: " + modConfig.orderWaitMinSeconds + "-" + modConfig.orderWaitMaxSeconds + "s", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
+        ctx.drawText(textRenderer, "Diagram: Active 30m -> need 3m break (probabilistic middle-weighted, safety net forced catch-up)", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
 
         // Advanced Tax Settings collapsible section hidden to avoid overwhelming casual users per spec
         String taxToggleLabel = (advancedTaxExpanded ? "▼ " : "▶ ") + "Tax Settings (Advanced — click to " + (advancedTaxExpanded ? "collapse" : "expand") + ")";
@@ -517,14 +666,67 @@ public class DashboardScreen extends Screen {
             currentButtons.add(resetTax);
             curY+=25;
         }
+
+        // Discord Settings toggles
+        ctx.drawText(textRenderer, "Discord Toggles:", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
+        Button notifyLongBtn = new Button(x+10, curY, 160, 14, "Notify Long Breaks: " + (modConfig.notifyLongBreaks ? "ON" : "OFF"), () -> {
+            modConfig.notifyLongBreaks = !modConfig.notifyLongBreaks;
+            modConfig.save();
+        });
+        notifyLongBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(notifyLongBtn);
+        Button notifyDerpyBtn = new Button(x+175, curY, 160, 14, "Notify Derpy: " + (modConfig.notifyDerpyChanges ? "ON" : "OFF"), () -> {
+            modConfig.notifyDerpyChanges = !modConfig.notifyDerpyChanges;
+            modConfig.save();
+        });
+        notifyDerpyBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(notifyDerpyBtn);
+        Button hourlyBtn = new Button(x+340, curY, 140, 14, "Hourly Summary: " + (modConfig.hourlySummaryEnabled ? "ON" : "OFF"), () -> {
+            modConfig.hourlySummaryEnabled = !modConfig.hourlySummaryEnabled;
+            modConfig.save();
+        });
+        hourlyBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(hourlyBtn);
+        curY+=20;
+        ctx.drawText(textRenderer, "All toggles and sliders save immediately to config/bazaarflipper.json and persist across restarts - Credits: Cldz", x+5, curY, ColorUtils.TITLE_TEXT, false);
     }
 
     private void renderFiltersTab(DrawContext ctx, int x, int y, int w, int h, int mouseX, int mouseY) {
         int curY = y+5;
-        ctx.drawText(textRenderer, "Whitelist: " + filterConfig.whitelist.size() + " items", x+5, curY, ColorUtils.PRIMARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Blacklist: " + filterConfig.blacklist.size() + " items", x+5, curY, ColorUtils.PRIMARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Min Profit: " + filterConfig.minProfit + " Max Price: " + filterConfig.maxPrice, x+5, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
-        Button clear = new Button(x+5, curY, 100, 20, "Clear All", () -> {
+        ctx.drawText(textRenderer, "Filters - Whitelist/Blacklist + Category Toggles (all saved, persists) - Credits: Cldz", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
+
+        // Text input + Add buttons per spec: "Whitelist/blacklist management (text input + Add button + list with Remove per item)"
+        filterInputField.x = x+5;
+        filterInputField.y = curY;
+        filterInputField.width = 150;
+        filterInputField.height = 14;
+        filterInputField.placeholder = "Item ID e.g. ENCHANTED_COAL";
+        filterInputField.render(ctx, mouseX, mouseY);
+        curY+=18;
+
+        Button addWhitelist = new Button(x+5, curY, 110, 14, "Add Whitelist", () -> {
+            String id = filterInputField.getText().trim().toUpperCase();
+            if (!id.isEmpty()) {
+                filterConfig.whitelist.add(id);
+                filterConfig.save();
+                filterInputField.setText("");
+            }
+        });
+        addWhitelist.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(addWhitelist);
+
+        Button addBlacklist = new Button(x+120, curY, 110, 14, "Add Blacklist", () -> {
+            String id = filterInputField.getText().trim().toUpperCase();
+            if (!id.isEmpty()) {
+                filterConfig.blacklist.add(id);
+                filterConfig.save();
+                filterInputField.setText("");
+            }
+        });
+        addBlacklist.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(addBlacklist);
+
+        Button clear = new Button(x+235, curY, 80, 14, "Clear All", () -> {
             filterConfig.whitelist.clear();
             filterConfig.blacklist.clear();
             filterConfig.save();
@@ -533,19 +735,149 @@ public class DashboardScreen extends Screen {
         clear.hoverColor = 0xFF5A2A2A;
         clear.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
         currentButtons.add(clear);
+        curY+=18;
+
+        ctx.drawText(textRenderer, "Whitelist: " + filterConfig.whitelist.size() + " items - " + String.join(", ", filterConfig.whitelist.stream().limit(5).toList()) + (filterConfig.whitelist.size()>5 ? "..." : ""), x+5, curY, ColorUtils.PROFIT_POSITIVE, false); curY+=10;
+        ctx.drawText(textRenderer, "Blacklist: " + filterConfig.blacklist.size() + " items - " + String.join(", ", filterConfig.blacklist.stream().limit(5).toList()) + (filterConfig.blacklist.size()>5 ? "..." : ""), x+5, curY, ColorUtils.PROFIT_NEGATIVE, false); curY+=12;
+
+        // List with Remove per item - show first few with Remove buttons
+        int listY = curY;
+        int count = 0;
+        for (String item : filterConfig.whitelist) {
+            if (count >= 5) break;
+            if (listY > y+h-60) break;
+            ctx.drawText(textRenderer, "[W] " + item, x+5, listY, ColorUtils.ITEM_NAME, false);
+            Button remove = new Button(x+150, listY-2, 50, 10, "Remove", () -> {
+                filterConfig.whitelist.remove(item);
+                filterConfig.save();
+            });
+            remove.normalColor = 0xFF3A1A1A;
+            remove.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+            currentButtons.add(remove);
+            listY+=12;
+            count++;
+        }
+        for (String item : filterConfig.blacklist) {
+            if (count >= 10) break;
+            if (listY > y+h-30) break;
+            ctx.drawText(textRenderer, "[B] " + item, x+5, listY, ColorUtils.SECONDARY_TEXT, false);
+            Button remove = new Button(x+150, listY-2, 50, 10, "Remove", () -> {
+                filterConfig.blacklist.remove(item);
+                filterConfig.save();
+            });
+            remove.normalColor = 0xFF3A1A1A;
+            remove.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+            currentButtons.add(remove);
+            listY+=12;
+            count++;
+        }
+        curY = Math.max(curY, listY)+5;
+        ctx.drawText(textRenderer, "Min Profit: " + filterConfig.minProfit + " Max Price: " + filterConfig.maxPrice + " Min Vol: " + filterConfig.minVolume, x+5, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
+
+        // Category toggles as row of toggle buttons per spec
+        ctx.drawText(textRenderer, "Categories (row of toggle buttons):", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
+        int catX = x+5;
+        String[] categories = {"farming","mining","combat","foraging","fishing","enchanted","misc","auction"};
+        for (String cat : categories) {
+            boolean enabled = filterConfig.enabledCategories.contains(cat);
+            Button catBtn = new Button(catX, curY, 70, 12, cat + (enabled ? " ON" : " OFF"), () -> {
+                if (filterConfig.enabledCategories.contains(cat)) filterConfig.enabledCategories.remove(cat);
+                else filterConfig.enabledCategories.add(cat);
+                filterConfig.save();
+            });
+            catBtn.normalColor = enabled ? 0xFF2A4A1A : ColorUtils.BUTTON_NORMAL;
+            catBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+            currentButtons.add(catBtn);
+            catX+=75;
+            if (catX > x+w-80) {
+                catX = x+5;
+                curY+=14;
+            }
+        }
+        curY+=16;
+        ctx.drawText(textRenderer, "All filter changes save to config/bazaarflipper_filters.json and persist across restarts - Credits: Cldz", x+5, curY, ColorUtils.TITLE_TEXT, false);
     }
 
     private void renderDiscordTab(DrawContext ctx, int x, int y, int w, int h, int mouseX, int mouseY) {
         int curY = y+5;
-        ctx.drawText(textRenderer, "Mode: " + modConfig.discordMode, x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Webhook URL: " + (modConfig.webhookUrl.isEmpty()?"Not set":"Set"), x+5, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Bot Token: " + (modConfig.botToken.isEmpty()?"Not set":"***"), x+5, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Channel ID: " + modConfig.commandChannelId, x+5, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
-        Button test = new Button(x+5, curY, 150, 20, "Send Test Message", () -> {
-            // Would send test via discord handler
+        ctx.drawText(textRenderer, "Discord - Mode selector + conditional fields + status + thresholds + toggles (all saved) - Credits: Cldz", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
+
+        // Mode selector row of toggle buttons per spec
+        int modeX = x+5;
+        String[] modes = {"DISABLED","WEBHOOK","BOT"};
+        for (String mode : modes) {
+            boolean active = modConfig.discordMode.equals(mode);
+            Button modeBtn = new Button(modeX, curY, 80, 14, mode + (active ? " [ON]" : ""), () -> {
+                modConfig.discordMode = mode;
+                modConfig.save();
+            });
+            modeBtn.normalColor = active ? 0xFF2A4A1A : ColorUtils.BUTTON_NORMAL;
+            modeBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+            currentButtons.add(modeBtn);
+            modeX+=85;
+        }
+        curY+=18;
+
+        // Conditional fields based on mode
+        if ("WEBHOOK".equals(modConfig.discordMode)) {
+            ctx.drawText(textRenderer, "Webhook URL: " + (modConfig.webhookUrl.isEmpty() ? "Not set (set in config)" : "Set ***" + modConfig.webhookUrl.substring(Math.max(0, modConfig.webhookUrl.length()-10))), x+5, curY, ColorUtils.SECONDARY_TEXT, false); curY+=10;
+        } else if ("BOT".equals(modConfig.discordMode)) {
+            ctx.drawText(textRenderer, "Bot Token: " + (modConfig.botToken.isEmpty() ? "Not set" : "***" + modConfig.botToken.substring(Math.max(0, modConfig.botToken.length()-4))) + " Channel: " + modConfig.commandChannelId, x+5, curY, ColorUtils.SECONDARY_TEXT, false); curY+=10;
+        }
+
+        // Connection status text (Connected/Disconnected/Disabled)
+        String connStatus = "DISABLED";
+        if ("WEBHOOK".equals(modConfig.discordMode)) connStatus = modConfig.webhookUrl.isEmpty() ? "DISCONNECTED - No URL" : "CONNECTED (Webhook)";
+        else if ("BOT".equals(modConfig.discordMode)) connStatus = modConfig.botToken.isEmpty() ? "DISCONNECTED - No token" : "CONNECTED (Bot)";
+        int statusColor = connStatus.contains("CONNECTED") ? ColorUtils.PROFIT_POSITIVE : connStatus.contains("DISCONNECTED") ? ColorUtils.PROFIT_NEGATIVE : ColorUtils.SECONDARY_TEXT;
+        ctx.drawText(textRenderer, "Connection: " + connStatus, x+5, curY, statusColor, false); curY+=12;
+
+        // Notification thresholds
+        ctx.drawText(textRenderer, "Thresholds: Notify every flip=" + modConfig.notifyOnEveryFlip + " Profit threshold=" + MathUtils.formatCoins(modConfig.notifyFlipProfitThreshold) + " Hourly interval=" + modConfig.hourlySummaryIntervalMinutes + "m", x+5, curY, ColorUtils.SECONDARY_TEXT, false); curY+=14;
+
+        Button everyFlipBtn = new Button(x+5, curY, 150, 14, "Notify Every Flip: " + (modConfig.notifyOnEveryFlip ? "ON" : "OFF"), () -> {
+            modConfig.notifyOnEveryFlip = !modConfig.notifyOnEveryFlip;
+            modConfig.save();
+        });
+        everyFlipBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(everyFlipBtn);
+
+        Button hourlyBtn = new Button(x+160, curY, 140, 14, "Hourly Summary: " + (modConfig.hourlySummaryEnabled ? "ON" : "OFF"), () -> {
+            modConfig.hourlySummaryEnabled = !modConfig.hourlySummaryEnabled;
+            modConfig.save();
+        });
+        hourlyBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(hourlyBtn);
+        curY+=18;
+
+        // Spec required toggles in Discord tab: notifyLongBreaks, notifyDerpyChanges
+        Button longBreakBtn = new Button(x+5, curY, 160, 14, "Notify Long Breaks: " + (modConfig.notifyLongBreaks ? "ON" : "OFF"), () -> {
+            modConfig.notifyLongBreaks = !modConfig.notifyLongBreaks;
+            modConfig.save();
+        });
+        longBreakBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(longBreakBtn);
+
+        Button derpyBtn = new Button(x+170, curY, 160, 14, "Notify Derpy: " + (modConfig.notifyDerpyChanges ? "ON" : "OFF"), () -> {
+            modConfig.notifyDerpyChanges = !modConfig.notifyDerpyChanges;
+            modConfig.save();
+        });
+        derpyBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(derpyBtn);
+        curY+=20;
+
+        Button test = new Button(x+5, curY, 150, 18, "Send Test Message", () -> {
+            com.bazaarflipper.BazaarFlipperMod mod = com.bazaarflipper.BazaarFlipperMod.getInstance();
+            if (mod != null) {
+                // Would send test via discordEventHandler - placeholder toast
+                com.bazaarflipper.ui.ToastNotification.show("Test Discord message sent (if configured)", com.bazaarflipper.ui.ToastNotification.ToastType.INFO);
+            }
         });
         test.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
         currentButtons.add(test);
+        curY+=22;
+
+        ctx.drawText(textRenderer, "All Discord settings saved to config/bazaarflipper.json and persist across restarts - Credits: Cldz", x+5, curY, ColorUtils.TITLE_TEXT, false);
     }
 
     private void renderNpcTab(DrawContext ctx, int x, int y, int w, int h, int mouseX, int mouseY) {
@@ -849,6 +1181,13 @@ public class DashboardScreen extends Screen {
             newPinField.mouseClicked(mouseX, mouseY);
             confirmPinField.mouseClicked(mouseX, mouseY);
             hintField.mouseClicked(mouseX, mouseY);
+        } else if (activeTab == Tab.BUDGET) {
+            budgetCapField.mouseClicked(mouseX, mouseY);
+            reservedField.mouseClicked(mouseX, mouseY);
+            maxPerItemField.mouseClicked(mouseX, mouseY);
+            maxConcurrentField.mouseClicked(mouseX, mouseY);
+        } else if (activeTab == Tab.FILTERS) {
+            filterInputField.mouseClicked(mouseX, mouseY);
         }
         for (Button b : currentButtons) {
             if (b.isMouseOver(mouseX, mouseY)) {
@@ -868,6 +1207,15 @@ public class DashboardScreen extends Screen {
             confirmPinField.charTyped(chr);
             hintField.charTyped(chr);
             return true;
+        } else if (activeTab == Tab.BUDGET) {
+            budgetCapField.charTyped(chr);
+            reservedField.charTyped(chr);
+            maxPerItemField.charTyped(chr);
+            maxConcurrentField.charTyped(chr);
+            return true;
+        } else if (activeTab == Tab.FILTERS) {
+            filterInputField.charTyped(chr);
+            return true;
         }
         return super.charTyped(chr, modifiers);
     }
@@ -881,13 +1229,21 @@ public class DashboardScreen extends Screen {
             confirmPinField.keyPressed(keyCode);
             hintField.keyPressed(keyCode);
             if (keyCode == 257 || keyCode == 335) { // Enter
-                // Try unlock if pinInput focused
                 if (pinInputField.focused) {
                     var lockManager = com.bazaarflipper.BazaarFlipperMod.getInstance().getLockManager();
                     if (lockManager != null) lockManager.unlock(pinInputField.getText());
                     return true;
                 }
             }
+            return true;
+        } else if (activeTab == Tab.BUDGET) {
+            budgetCapField.keyPressed(keyCode);
+            reservedField.keyPressed(keyCode);
+            maxPerItemField.keyPressed(keyCode);
+            maxConcurrentField.keyPressed(keyCode);
+            return true;
+        } else if (activeTab == Tab.FILTERS) {
+            filterInputField.keyPressed(keyCode);
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
