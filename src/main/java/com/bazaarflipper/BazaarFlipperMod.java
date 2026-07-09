@@ -23,6 +23,7 @@ import com.bazaarflipper.ui.HudOverlay;
 import com.bazaarflipper.ui.ToastNotification;
 import com.bazaarflipper.util.Logger;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
@@ -134,7 +135,8 @@ public class BazaarFlipperMod implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         INSTANCE = this;
-        Logger.info("Initializing Bazaar Flipper Mod v6.0 for MC 26.1.2 Loader 0.19.3");
+        Logger.info("Initializing Bazaar Flipper Mod v6.0 for MC 26.1.2 Loader 0.19.3 — Credits: Cldz");
+        Logger.info("All config files (bazaarflipper.json, budget, npc, player, filters, waypoints, items, session, history) will be saved and persist across game restarts per user request");
 
         // 1. Load ModConfig
         modConfig = ModConfig.load();
@@ -298,6 +300,13 @@ public class BazaarFlipperMod implements ClientModInitializer {
         HudRenderCallback.EVENT.register(this::onHudRender);
         ClientReceiveMessageEvents.GAME.register(this::onGameMessage);
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> onDisconnect());
+        // Ensure all config saved even when restart game - save on client stopping
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            Logger.info("Client stopping - saving all configs for persistence across restarts. Credits: Cldz");
+            saveAllConfigs();
+            sessionStateManager.saveState();
+            waypointRegistry.saveCustomWaypoints();
+        });
 
         // API polling start
         hypixelAPIClient.startPolling();
@@ -510,11 +519,29 @@ public class BazaarFlipperMod implements ClientModInitializer {
     }
 
     private void onDisconnect() {
-        Logger.info("Disconnected from server");
+        Logger.info("Disconnected from server - saving all configs to persist across restarts. Credits: Cldz");
         breakScheduler.cancelBreak();
         sessionStateManager.saveState();
+        saveAllConfigs();
+        waypointRegistry.saveCustomWaypoints();
+        itemDatabase.save();
         if (!worldStateRecovery.isLimboCooldownActive()) {
             reconnectManager.onDisconnect();
+        }
+    }
+
+    private void saveAllConfigs() {
+        try {
+            modConfig.save();
+            budgetConfig.save();
+            npcConfig.save();
+            playerCapabilityConfig.save();
+            filterConfig.save();
+            waypointRegistry.saveCustomWaypoints();
+            itemDatabase.save();
+            Logger.info("All configs saved (bazaarflipper.json, budget, npc, player, filters, waypoints, items) - persists across restarts");
+        } catch (Exception e) {
+            Logger.error("Failed to save all configs on shutdown", e);
         }
     }
 
@@ -625,4 +652,10 @@ public class BazaarFlipperMod implements ClientModInitializer {
     }
 
     public static BazaarFlipperMod getInstance() { return INSTANCE; }
+
+    public WaypointRegistry getWaypointRegistry() { return waypointRegistry; }
+    public NPCConfig getNpcConfig() { return npcConfig; }
+    public ModConfig getModConfig() { return modConfig; }
+    public BudgetConfig getBudgetConfig() { return budgetConfig; }
+    public FilterConfig getFilterConfig() { return filterConfig; }
 }

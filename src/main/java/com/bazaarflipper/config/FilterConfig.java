@@ -53,6 +53,7 @@ public class FilterConfig {
             try (FileWriter w = new FileWriter(f)) {
                 GSON.toJson(this, w);
             }
+            Logger.info("FilterConfig saved to " + FILE + " - persists across restarts, credits Cldz");
         } catch (Exception e) {
             Logger.error("Failed to save filter config", e);
         }

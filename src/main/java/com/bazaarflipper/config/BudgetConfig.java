@@ -43,6 +43,7 @@ public class BudgetConfig {
             try (FileWriter w = new FileWriter(f)) {
                 GSON.toJson(this, w);
             }
+            Logger.info("BudgetConfig saved to " + FILE + " - persists across restarts, credits Cldz");
         } catch (Exception e) {
             Logger.error("Failed to save budget config", e);
         }

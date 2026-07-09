@@ -1,6 +1,9 @@
-# Bazaar Flipper Mod v6.0
+# Bazaar Flipper Mod v6.0 — by Cldz
 
 Fabric Loader 0.19.3 | Minecraft 26.1.2 | Java 21+ | Hypixel Skyblock
+
+> **Credits:** All work in this repository is credited to **Cldz**. Original concept, implementation, and maintenance by Cldz. Thank you for developing and supporting this mod.
+
 
 Automated bazaar, NPC and AH craft flip mod with humanized navigation, mayor awareness, break scheduler, tax handling, and Discord integration.
 

@@ -110,6 +110,7 @@ public class ModConfig {
             try (FileWriter writer = new FileWriter(file)) {
                 GSON.toJson(this, writer);
             }
+            Logger.info("ModConfig saved to " + CONFIG_FILE + " - persists across restarts, credits Cldz");
         } catch (IOException e) {
             Logger.error("Failed to save config", e);
         }
