@@ -18,10 +18,13 @@ jobs:
           if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
             mkdir -p gradle/wrapper
             curl -L --retry 3 -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar || wget -O gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar
+            ls -lh gradle/wrapper/
           fi
       - name: Setup Gradle cache disabled
         uses: gradle/actions/setup-gradle@v3
-        with: { gradle-version: '9.4.0', cache-disabled: true }
+        with:
+          gradle-version: '9.4.0'
+          cache-disabled: true
       - name: Build
         run: ./gradlew build --stacktrace --no-daemon
       - name: List libs
