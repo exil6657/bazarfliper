@@ -1,10 +1,7 @@
-
 name: Build Bazaar Flipper
 on:
-  push:
-    branches: [ "main", "arena/*" ]
-  pull_request:
-    branches: [ "main" ]
+  push: { branches: [ "main", "arena/*", "fix/*" ] }
+  pull_request: { branches: [ "main" ] }
   workflow_dispatch:
 jobs:
   build:
@@ -13,23 +10,24 @@ jobs:
       - uses: actions/checkout@v4
       - name: Set up JDK 21
         uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-      - name: Set up Gradle 9.4.0
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '9.4.0'
-      - name: Grant execute permission for gradlew
+        with: { java-version: '21', distribution: 'temurin' }
+      - name: Grant execute for gradlew
         run: chmod +x gradlew
       - name: Generate wrapper jar if missing
         run: |
           if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-            gradle wrapper --gradle-version 9.4.0 || curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar
+            mkdir -p gradle/wrapper
+            curl -L --retry 3 -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar || wget -O gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar
           fi
-      - name: Build with Gradle (Loom - unobfuscated 26.1.2)
-        run: ./gradlew build --stacktrace
-      - name: Upload JAR artifact
+      - name: Setup Gradle cache disabled
+        uses: gradle/actions/setup-gradle@v3
+        with: { gradle-version: '9.4.0', cache-disabled: true }
+      - name: Build
+        run: ./gradlew build --stacktrace --no-daemon
+      - name: List libs
+        run: ls -lh build/libs/
+      - name: Upload JAR
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bazaar-flipper-jar
