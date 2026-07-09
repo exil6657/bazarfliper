@@ -6,7 +6,7 @@ import com.bazaarflipper.pathfinding.LocationValidator;
 import com.bazaarflipper.pathfinding.WorldStateRecovery;
 import com.bazaarflipper.util.Logger;
 import com.bazaarflipper.util.MathUtils;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 public class ReconnectManager {
 
@@ -67,11 +67,11 @@ public class ReconnectManager {
 
                 // Try to reconnect: need to use Minecraft's reconnect? Simplified: we cannot fully implement without mixins; we will attempt to connect via server entry
                 try {
-                    MinecraftClient mc = MinecraftClient.getInstance();
-                    if (mc.getCurrentServerEntry() != null) {
+                    Minecraft mc = Minecraft.getInstance();
+                    if (mc.getCurrentServer() != null) {
                         // In real mod, we would use mc's connect logic; placeholder
                         // For now we just check if network handler restored
-                        if (mc.getNetworkHandler() != null) {
+                        if (mc.getConnection() != null) {
                             // Assume success
                             boolean worldReady = locationValidator.waitForWorldState(LocationValidator.WorldState.SKYBLOCK_HUB, 30_000);
                             if (worldReady) {

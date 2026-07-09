@@ -3,8 +3,8 @@ package com.bazaarflipper.ui.widgets;
 import com.bazaarflipper.ui.GuiTextures;
 import com.bazaarflipper.util.ColorUtils;
 import com.bazaarflipper.util.MathUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 /**
  * Slider: track rectangle + handle rectangle at proportional position
@@ -49,14 +49,14 @@ public class CustomSlider {
         value = min + t * (max - min);
     }
 
-    public void render(DrawContext context, int mouseX, int mouseY) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
+        Minecraft mc = Minecraft.getInstance();
         int trackY = y + height/2 - 2;
         int trackH = 4;
 
         // Track rectangle
         try {
-            context.drawTexture(GuiTextures.PROGRESS_BG, x, trackY, 0,0, width, trackH, width, trackH);
+            throw new UnsupportedOperationException("Texture blit disabled for 26.1 compatibility");
         } catch (Exception e) {
             context.fill(x, trackY, x+width, trackY+trackH, ColorUtils.PROGRESS_BG);
         }
@@ -65,7 +65,7 @@ public class CustomSlider {
         double t = (value - min) / (max - min);
         int fillW = (int)(width * t);
         try {
-            context.drawTexture(GuiTextures.PROGRESS_FILL, x, trackY, 0,0, fillW, trackH, fillW, trackH);
+            throw new UnsupportedOperationException("Texture blit disabled for 26.1 compatibility");
         } catch (Exception e) {
             context.fill(x, trackY, x+fillW, trackY+trackH, ColorUtils.PROGRESS_FILL);
         }
@@ -79,6 +79,6 @@ public class CustomSlider {
 
         // Label + value
         String display = label + ": " + String.format("%.1f", value);
-        context.drawText(mc.textRenderer, display, x, y-10, ColorUtils.SECONDARY_TEXT, false);
+        context.text(mc.font, display, x, y-10, ColorUtils.SECONDARY_TEXT, false);
     }
 }

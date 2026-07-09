@@ -1,7 +1,7 @@
 package com.bazaarflipper.pathfinding;
 
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,39 +58,39 @@ public class PathSmoother {
         return true;
     }
 
-    public List<Vec3d> smoothWithJitter(List<BlockPos> pruned) {
-        List<Vec3d> jittered = new ArrayList<>();
+    public List<Vec3> smoothWithJitter(List<BlockPos> pruned) {
+        List<Vec3> jittered = new ArrayList<>();
         for (BlockPos bp : pruned) {
             double offsetX = (random.nextDouble()-0.5)*0.6;
             double offsetZ = (random.nextDouble()-0.5)*0.6;
-            jittered.add(new Vec3d(bp.getX()+0.5+offsetX, bp.getY(), bp.getZ()+0.5+offsetZ));
+            jittered.add(new Vec3(bp.getX()+0.5+offsetX, bp.getY(), bp.getZ()+0.5+offsetZ));
         }
 
-        List<Vec3d> smooth = new ArrayList<>();
+        List<Vec3> smooth = new ArrayList<>();
         int segments = 4;
         for (int i=0;i<jittered.size()-1;i++) {
-            Vec3d p0 = i>0 ? jittered.get(i-1) : jittered.get(i);
-            Vec3d p1 = jittered.get(i);
-            Vec3d p2 = jittered.get(i+1);
-            Vec3d p3 = (i+2<jittered.size()) ? jittered.get(i+2) : p2;
+            Vec3 p0 = i>0 ? jittered.get(i-1) : jittered.get(i);
+            Vec3 p1 = jittered.get(i);
+            Vec3 p2 = jittered.get(i+1);
+            Vec3 p3 = (i+2<jittered.size()) ? jittered.get(i+2) : p2;
             smooth.add(p1);
             for (int j=1;j<segments;j++) {
                 double t = j/(double)segments;
-                Vec3d cat = catmullRom(p0,p1,p2,p3,t);
+                Vec3 cat = catmullRom(p0,p1,p2,p3,t);
                 double bob = Math.sin((i*segments+j)*0.6)*0.03;
-                smooth.add(new Vec3d(cat.x, cat.y+bob, cat.z));
+                smooth.add(new Vec3(cat.x, cat.y+bob, cat.z));
             }
         }
         if (!jittered.isEmpty()) smooth.add(jittered.get(jittered.size()-1));
         return smooth;
     }
 
-    private Vec3d catmullRom(Vec3d p0, Vec3d p1, Vec3d p2, Vec3d p3, double t) {
+    private Vec3 catmullRom(Vec3 p0, Vec3 p1, Vec3 p2, Vec3 p3, double t) {
         double t2 = t*t;
         double t3 = t2*t;
         double x = 0.5*((2*p1.x) + (-p0.x + p2.x)*t + (2*p0.x -5*p1.x +4*p2.x -p3.x)*t2 + (-p0.x +3*p1.x -3*p2.x + p3.x)*t3);
         double y = 0.5*((2*p1.y) + (-p0.y + p2.y)*t + (2*p0.y -5*p1.y +4*p2.y -p3.y)*t2 + (-p0.y +3*p1.y -3*p2.y + p3.y)*t3);
         double z = 0.5*((2*p1.z) + (-p0.z + p2.z)*t + (2*p0.z -5*p1.z +4*p2.z -p3.z)*t2 + (-p0.z +3*p1.z -3*p2.z + p3.z)*t3);
-        return new Vec3d(x,y,z);
+        return new Vec3(x,y,z);
     }
 }

@@ -6,8 +6,8 @@ import com.bazaarflipper.mayor.MayorData;
 import com.bazaarflipper.mayor.MayorTracker;
 import com.bazaarflipper.util.ColorUtils;
 import com.bazaarflipper.util.MathUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 /**
  * Rendered as overlay panel near hovered row. All via fill and drawText.
@@ -22,9 +22,9 @@ public class MarketContextWidget {
         this.mayorTracker = mayorTracker;
     }
 
-    public void render(DrawContext context, int x, int y, FlipStrategy.FlipOpportunity opp) {
+    public void render(GuiGraphicsExtractor context, int x, int y, FlipStrategy.FlipOpportunity opp) {
         if (opp == null) return;
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
 
         int width = 200;
         int height = 180;
@@ -36,56 +36,56 @@ public class MarketContextWidget {
         int curY = y+5;
         int lineH = 10;
 
-        context.drawText(mc.textRenderer, opp.productId, x+5, curY, ColorUtils.TITLE_TEXT, false);
+        context.text(mc.font, opp.productId, x+5, curY, ColorUtils.TITLE_TEXT, false);
         curY+=lineH;
 
-        context.drawText(mc.textRenderer, "Spread: " + MathUtils.formatCoins(opp.rawSpread) + " ("+String.format("%.2f%%", opp.sellPrice>0? (opp.rawSpread/opp.buyPrice*100):0)+")", x+5, curY, ColorUtils.PRIMARY_TEXT, false);
+        context.text(mc.font, "Spread: " + MathUtils.formatCoins(opp.rawSpread) + " ("+String.format("%.2f%%", opp.sellPrice>0? (opp.rawSpread/opp.buyPrice*100):0)+")", x+5, curY, ColorUtils.PRIMARY_TEXT, false);
         curY+=lineH;
 
         // Tax-adjusted profit
         if (opp.strategyType.equals("AH_CRAFT")) {
-            context.drawText(mc.textRenderer, "AH Profit: " + MathUtils.formatCoins(opp.profitPerUnitAfterTax) + " / " + MathUtils.formatCoins(opp.totalProfitAfterTax), x+5, curY, ColorUtils.PROFIT_POSITIVE, false);
+            context.text(mc.font, "AH Profit: " + MathUtils.formatCoins(opp.profitPerUnitAfterTax) + " / " + MathUtils.formatCoins(opp.totalProfitAfterTax), x+5, curY, ColorUtils.PROFIT_POSITIVE, false);
             curY+=lineH;
-            context.drawText(mc.textRenderer, "Tax: " + opp.taxTier + " " + String.format("%.2f%%", opp.taxRate*100), x+5, curY, getTaxColor(opp.taxTier), false);
+            context.text(mc.font, "Tax: " + opp.taxTier + " " + String.format("%.2f%%", opp.taxRate*100), x+5, curY, getTaxColor(opp.taxTier), false);
             curY+=lineH;
             if (opp.derpyWarning) {
-                context.drawText(mc.textRenderer, "⚠️ Derpy: AH tax increased — profit reduced", x+5, curY, ColorUtils.WARNING, false);
+                context.text(mc.font, "⚠️ Derpy: AH tax increased — profit reduced", x+5, curY, ColorUtils.WARNING, false);
                 curY+=lineH;
             }
         } else {
-            context.drawText(mc.textRenderer, "Profit: " + MathUtils.formatCoins(opp.profitPerUnitAfterTax) + " / " + MathUtils.formatCoins(opp.totalProfitAfterTax), x+5, curY, ColorUtils.PROFIT_POSITIVE, false);
+            context.text(mc.font, "Profit: " + MathUtils.formatCoins(opp.profitPerUnitAfterTax) + " / " + MathUtils.formatCoins(opp.totalProfitAfterTax), x+5, curY, ColorUtils.PROFIT_POSITIVE, false);
             curY+=lineH;
-            context.drawText(mc.textRenderer, "Bazaar Tax: " + String.format("%.2f%%", opp.taxRate*100), x+5, curY, ColorUtils.SECONDARY_TEXT, false);
+            context.text(mc.font, "Bazaar Tax: " + String.format("%.2f%%", opp.taxRate*100), x+5, curY, ColorUtils.SECONDARY_TEXT, false);
             curY+=lineH;
         }
 
-        context.drawText(mc.textRenderer, "Volume: " + MathUtils.formatCoins(opp.dailyVolume), x+5, curY, ColorUtils.SECONDARY_TEXT, false);
+        context.text(mc.font, "Volume: " + MathUtils.formatCoins(opp.dailyVolume), x+5, curY, ColorUtils.SECONDARY_TEXT, false);
         curY+=lineH;
 
-        context.drawText(mc.textRenderer, "Backlog: " + (int)opp.backlogPressure + " orders ahead", x+5, curY, ColorUtils.SECONDARY_TEXT, false);
+        context.text(mc.font, "Backlog: " + (int)opp.backlogPressure + " orders ahead", x+5, curY, ColorUtils.SECONDARY_TEXT, false);
         curY+=lineH;
 
-        context.drawText(mc.textRenderer, "Orders at top: " + opp.orderCountAtTop, x+5, curY, ColorUtils.SECONDARY_TEXT, false);
+        context.text(mc.font, "Orders at top: " + opp.orderCountAtTop, x+5, curY, ColorUtils.SECONDARY_TEXT, false);
         curY+=lineH;
 
-        context.drawText(mc.textRenderer, "Budget Profit: " + MathUtils.formatCoins(opp.budgetProfit), x+5, curY, ColorUtils.PROFIT_POSITIVE, false);
+        context.text(mc.font, "Budget Profit: " + MathUtils.formatCoins(opp.budgetProfit), x+5, curY, ColorUtils.PROFIT_POSITIVE, false);
         curY+=lineH;
 
-        context.drawText(mc.textRenderer, "Fill Est: " + formatDuration(opp.fillTimeEstimateMs), x+5, curY, ColorUtils.SECONDARY_TEXT, false);
+        context.text(mc.font, "Fill Est: " + formatDuration(opp.fillTimeEstimateMs), x+5, curY, ColorUtils.SECONDARY_TEXT, false);
         curY+=lineH;
 
         String stability = opp.priceStabilityScore < 5 ? "Stable" : opp.priceStabilityScore < 15 ? "Moderate" : "Volatile";
-        context.drawText(mc.textRenderer, "Stability: " + stability, x+5, curY, ColorUtils.SECONDARY_TEXT, false);
+        context.text(mc.font, "Stability: " + stability, x+5, curY, ColorUtils.SECONDARY_TEXT, false);
         curY+=lineH;
 
         if (opp.mayorModifier !=0 && opp.mayorModifier !=1.0) {
-            context.drawText(mc.textRenderer, "Mayor Mod: " + String.format("%.2fx", opp.mayorModifier), x+5, curY, ColorUtils.TITLE_TEXT, false);
+            context.text(mc.font, "Mayor Mod: " + String.format("%.2fx", opp.mayorModifier), x+5, curY, ColorUtils.TITLE_TEXT, false);
             curY+=lineH;
         }
 
         MayorData mayor = mayorTracker.getCurrentMayor();
         if (mayor != null && mayor.isDerpy() && opp.strategyType.equals("AH_CRAFT")) {
-            context.drawText(mc.textRenderer, "Derpy active!", x+5, curY, ColorUtils.WARNING, false);
+            context.text(mc.font, "Derpy active!", x+5, curY, ColorUtils.WARNING, false);
             curY+=lineH;
         }
 

@@ -1,9 +1,10 @@
 package com.bazaarflipper.mixin;
 
 import com.bazaarflipper.util.Logger;
-import net.minecraft.network.ClientConnection;
-import net.minecraft.network.listener.PacketListener;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.Connection;
+import net.minecraft.network.PacketListener;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.PacketSendListener;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -18,11 +19,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Rule 2: No modified packet fields
  * Rule 5: No modification of client brand packet
  */
-@Mixin(ClientConnection.class)
+@Mixin(Connection.class)
 public class MixinClientConnection {
 
-    @Inject(method = "send(Lnet/minecraft/network/packet/Packet;Lnet/minecraft/network/PacketCallbacks;Z)V", at = @At("HEAD"))
-    private void onSendPacket(Packet<?> packet, net.minecraft.network.PacketCallbacks callbacks, boolean flush, CallbackInfo ci) {
+    @Inject(method = "send(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketSendListener;Z)V", at = @At("HEAD"))
+    private void onSendPacket(Packet<?> packet, PacketSendListener callbacks, boolean flush, CallbackInfo ci) {
         // Read-only observation to verify compliance - must NOT modify packet
         // This is a safety audit mixin only per fabric.mod.json
         try {

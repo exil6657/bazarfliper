@@ -50,9 +50,9 @@ public class GuiWatchdog {
                 discordHandler.onGuiWatchdog(currentGuiTitle, retryCount, false);
                 // Close GUI
                 try {
-                    net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+                    net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                     mc.execute(() -> {
-                        if (mc.currentScreen != null) mc.setScreen(null);
+                        if (mc.screen != null) mc.setScreen(null);
                     });
                 } catch (Exception e) {
                     Logger.error("Failed to close GUI on watchdog", e);
@@ -74,9 +74,9 @@ public class GuiWatchdog {
 
     public long getCurrentPingMs() {
         try {
-            var mc = net.minecraft.client.MinecraftClient.getInstance();
-            if (mc.getNetworkHandler() != null && mc.player != null) {
-                var entry = mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid());
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc.getConnection() != null && mc.player != null) {
+                var entry = mc.getConnection().getPlayerInfo(mc.player.getUUID());
                 if (entry != null) {
                     // entry.getLatency() in mojmap is latency
                     // return entry.getLatency();

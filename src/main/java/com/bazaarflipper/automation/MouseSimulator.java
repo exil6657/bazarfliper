@@ -1,7 +1,7 @@
 package com.bazaarflipper.automation;
 
 import com.bazaarflipper.util.MathUtils;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 /**
  * Simulates human-like mouse movement via bezier curves.
@@ -13,7 +13,7 @@ public class MouseSimulator {
     private double currentY = 0;
 
     public void moveMouseTo(double targetX, double targetY, long durationMs) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.getWindow() == null) return;
 
         double startX = currentX;

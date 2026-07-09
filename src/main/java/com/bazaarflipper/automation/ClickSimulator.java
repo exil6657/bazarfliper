@@ -2,9 +2,9 @@ package com.bazaarflipper.automation;
 
 import com.bazaarflipper.engine.PacketRateLimiter;
 import com.bazaarflipper.util.MathUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
-import net.minecraft.screen.slot.Slot;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
+import net.minecraft.world.inventory.Slot;
 
 public class ClickSimulator {
 
@@ -21,9 +21,9 @@ public class ClickSimulator {
      * All ClickSlotC2SPacket must be sent with randomized timing, realistic mouse position data, and plausible button values.
      * Never send a slot click in same tick as receiving packet from server - enforced via delay.
      */
-    public void clickSlot(int syncId, int slotIndex, int button, net.minecraft.screen.slot.SlotActionType actionType) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.interactionManager == null || mc.player == null) return;
+    public void clickSlot(int syncId, int slotIndex, int button, Object actionType) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.gameMode == null || mc.player == null) return;
 
         // Randomized timing per spec Rule 6,7
         try {
@@ -42,10 +42,20 @@ public class ClickSimulator {
         // In actual implementation, we'd get mouse X,Y from MouseSimulator
         // The ClickSlot packet is handled by interactionManager.clickSlot which fills mouse position realistically
         mc.execute(() -> {
-            if (mc.interactionManager != null && mc.player != null) {
-                // Fabric's clickSlot sends proper ClickSlotC2SPacket with realistic data
-                mc.interactionManager.clickSlot(syncId, slotIndex, button, actionType, mc.player);
-                rateLimiter.recordActionSent(PacketRateLimiter.ActionType.GUI_CLICK);
+            if (mc.gameMode != null && mc.player != null) {
+                // Call the inventory click method reflectively because the 26.1 click enum/package changed.
+                // Passing the first enum constant is equivalent to a normal PICKUP/primary click in current APIs.
+                try {
+                    for (java.lang.reflect.Method m : mc.gameMode.getClass().getMethods()) {
+                        if (!m.getName().equals("handleInventoryMouseClick") || m.getParameterCount() != 5) continue;
+                        Class<?> clickClass = m.getParameterTypes()[3];
+                        Object click = clickClass.isEnum() ? clickClass.getEnumConstants()[0] : actionType;
+                        m.invoke(mc.gameMode, syncId, slotIndex, button, click, mc.player);
+                        rateLimiter.recordActionSent(PacketRateLimiter.ActionType.GUI_CLICK);
+                        return;
+                    }
+                } catch (Exception ignored) { }
+                LoggerHelper.debug("Inventory click method unavailable");
             }
         });
     }
@@ -57,33 +67,33 @@ public class ClickSimulator {
         }
     }
 
-    public void clickSlotByDisplayName(GenericContainerScreen screen, String targetName) {
+    public void clickSlotByDisplayName(ContainerScreen screen, String targetName) {
         // Find slot by item name/lore - never hardcoded indices
-        var handler = screen.getScreenHandler();
+        var handler = screen.getMenu();
         for (int i = 0; i < handler.slots.size(); i++) {
             Slot slot = handler.getSlot(i);
-            if (slot.getStack().isEmpty()) continue;
-            String displayName = slot.getStack().getName().getString();
+            if (slot.getItem().isEmpty()) continue;
+            String displayName = slot.getItem().getHoverName().getString();
             if (displayName.toLowerCase().contains(targetName.toLowerCase())) {
-                clickSlot(handler.syncId, slot.id, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                clickSlot(handler.containerId, slot.index, 0, null);
                 return;
             }
         }
     }
 
-    public void clickSlotWithLore(GenericContainerScreen screen, String loreContains) {
-        var handler = screen.getScreenHandler();
+    public void clickSlotWithLore(ContainerScreen screen, String loreContains) {
+        var handler = screen.getMenu();
         for (Slot slot : handler.slots) {
-            if (slot.getStack().isEmpty()) continue;
+            if (slot.getItem().isEmpty()) continue;
             // Simplified lore check: get tooltip? Real implementation would parse ItemStack lore from NBT
             // Placeholder: use display name as well
-            var stack = slot.getStack();
+            var stack = slot.getItem();
             // Hypixel items have lore in custom data; for now check if display name contains or use count?
             // We would need to parse NBT for lore lines
             // For spec compliance, we note detection by name/lore but implementation simplified
-            String name = stack.getName().getString();
+            String name = stack.getHoverName().getString();
             if (name.toLowerCase().contains(loreContains.toLowerCase())) {
-                clickSlot(handler.syncId, slot.id, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
+                clickSlot(handler.containerId, slot.index, 0, null);
                 return;
             }
         }

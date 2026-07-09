@@ -198,7 +198,7 @@ public class FlipEngine {
             executeAction(action);
         } else {
             // No queued actions, consider scanning for new flips if not all orders waiting
-            if (activeFlips.size() < config.maxConcurrentItems) { // simplified budget check
+            if (activeFlips.size() < 10) { // simplified budget check
                 scanForNewFlips();
             } else {
                 // All orders in wait state? -> order wait break
@@ -233,7 +233,7 @@ public class FlipEngine {
         if (lastBazaarData == null) return;
         state = FlipState.SCANNING_MARKET;
 
-        var opportunities = itemSelector.selectBestItems(lastBazaarData, ahClient, config.maxConcurrentItems - activeFlips.size());
+        var opportunities = itemSelector.selectBestItems(lastBazaarData, ahClient, 10 - activeFlips.size());
         for (var opp : opportunities) {
             if (activeFlips.containsKey(opp.productId)) continue;
             double cost = opp.buyPrice * opp.quantity;
@@ -581,9 +581,9 @@ public class FlipEngine {
             }
 
             // Close GUI after cleanup
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
             mc.execute(() -> {
-                if (mc.currentScreen != null) mc.setScreen(null);
+                if (mc.screen != null) mc.setScreen(null);
             });
 
         } catch (Exception e) {

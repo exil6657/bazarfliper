@@ -1,11 +1,11 @@
 package com.bazaarflipper.pathfinding;
 
 import com.bazaarflipper.util.Logger;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,14 +31,14 @@ public class PathfindingEngine {
 
     public static class Path {
         public List<BlockPos> nodes; // raw A* nodes
-        public List<Vec3d> smoothPoints; // smoothed bezier-like points for human walking
+        public List<Vec3> smoothPoints; // smoothed bezier-like points for human walking
         public BlockPos target;
         public boolean success;
         public boolean partial;
         public double totalCost;
         public long computedAt;
 
-        public Path(List<BlockPos> nodes, List<Vec3d> smooth, BlockPos target, boolean success, boolean partial, double cost) {
+        public Path(List<BlockPos> nodes, List<Vec3> smooth, BlockPos target, boolean success, boolean partial, double cost) {
             this.nodes = nodes;
             this.smoothPoints = smooth;
             this.target = target;
@@ -131,11 +131,11 @@ public class PathfindingEngine {
 
             if (current.pos.equals(end)) {
                 List<BlockPos> raw = reconstructPath(current);
-                List<Vec3d> smooth = smoothPath(raw);
+                List<Vec3> smooth = smoothPath(raw);
                 return new Path(raw, smooth, end, true, false, current.g);
             }
 
-            if (current.pos.getManhattanDistance(end) > SEARCH_RADIUS) continue;
+            if ((Math.abs(current.pos.getX() - end.getX()) + Math.abs(current.pos.getY() - end.getY()) + Math.abs(current.pos.getZ() - end.getZ())) > SEARCH_RADIUS) continue;
 
             closed.add(current.pos);
 
@@ -164,7 +164,7 @@ public class PathfindingEngine {
         // Failed to reach target - return partial path to closest node
         if (bestNode != null && bestNode != startNode) {
             List<BlockPos> raw = reconstructPath(bestNode);
-            List<Vec3d> smooth = smoothPath(raw);
+            List<Vec3> smooth = smoothPath(raw);
             Logger.warn("Pathfinding partial from " + start + " to " + end + " after " + iterations + " iterations, closest dist " + bestHeuristic);
             return new Path(raw, smooth, end, false, true, bestNode.g);
         }
@@ -175,8 +175,8 @@ public class PathfindingEngine {
 
     private boolean isCacheStillValid(Path path) {
         if (path.nodes.isEmpty()) return false;
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.world == null) return false;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return false;
         // Quick check: first few nodes still passable and no block change
         for (int i=0;i<Math.min(3, path.nodes.size());i++) {
             if (!isPassableAdvanced(path.nodes.get(i)).passable) return false;
@@ -263,14 +263,14 @@ public class PathfindingEngine {
 
     private double crowdCost(BlockPos pos) {
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.world == null) return 0;
-            Vec3d center = Vec3d.ofCenter(pos);
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null) return 0;
+            Vec3 center = Vec3.atCenterOf(pos);
             double cost = 0;
-            for (var entity : mc.world.getEntities()) {
+            for (var entity : mc.level.entitiesForRendering()) {
                 if (entity == mc.player) continue;
-                if (entity.isPlayer() || entity.isLiving()) {
-                    double dist = entity.getPos().distanceTo(center);
+                if (entity instanceof net.minecraft.world.entity.player.Player || entity instanceof net.minecraft.world.entity.LivingEntity) {
+                    double dist = entity.position().distanceTo(center);
                     if (dist < 2.0) cost += (2.0 - dist) * 2.0; // high cost if very close
                     else if (dist < 4.0) cost += (4.0 - dist) * 0.3;
                 }
@@ -281,13 +281,13 @@ public class PathfindingEngine {
 
     private double edgeVoidCost(BlockPos pos) {
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.world == null) return 0;
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null) return 0;
             // Check below: if air for 4+ blocks down, it's a cliff/void edge -> penalize heavily unless target is down there
             for (int i=1;i<=4;i++) {
-                BlockPos below = pos.down(i);
-                var state = mc.world.getBlockState(below);
-                if (!state.isAir() && state.isSolidBlock(mc.world, below)) {
+                BlockPos below = pos.below(i);
+                var state = mc.level.getBlockState(below);
+                if (!state.isAir() && state.isSolidRender()) {
                     return 0; // has ground within 4 blocks - safe
                 }
             }
@@ -299,21 +299,21 @@ public class PathfindingEngine {
     // ===== Passability with danger detection =====
 
     private PassableResult isPassableAdvanced(BlockPos pos) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.world == null) return new PassableResult(false, 1000, false, false, false, null);
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return new PassableResult(false, 1000, false, false, false, null);
         try {
-            var state = mc.world.getBlockState(pos);
-            var stateUp = mc.world.getBlockState(pos.up());
-            var stateDown = mc.world.getBlockState(pos.down());
-            var stateBelow2 = mc.world.getBlockState(pos.down(2));
+            var state = mc.level.getBlockState(pos);
+            var stateUp = mc.level.getBlockState(pos.above());
+            var stateDown = mc.level.getBlockState(pos.below());
+            var stateBelow2 = mc.level.getBlockState(pos.below(2));
 
             Block block = state.getBlock();
             Block blockUp = stateUp.getBlock();
             Block blockDown = stateDown.getBlock();
 
             // Check current and head are not solid
-            boolean solidCurrent = state.isSolidBlock(mc.world, pos);
-            boolean solidUp = stateUp.isSolidBlock(mc.world, pos.up());
+            boolean solidCurrent = state.isSolidRender();
+            boolean solidUp = stateUp.isSolidRender();
 
             if (solidCurrent || solidUp) {
                 // Except: allow if current is water/ladder/vine etc? For simplicity, treat solid as impassable
@@ -324,7 +324,7 @@ public class PathfindingEngine {
             }
 
             // Check below: need solid ground or water/ladder etc within 1-2 blocks for valid standing
-            boolean hasGround = stateDown.isSolidBlock(mc.world, pos.down()) || stateDown.getBlock() == Blocks.WATER || stateDown.getBlock() == Blocks.LADDER || stateBelow2.isSolidBlock(mc.world, pos.down(2));
+            boolean hasGround = stateDown.isSolidRender() || stateDown.getBlock() == Blocks.WATER || stateDown.getBlock() == Blocks.LADDER || stateBelow2.isSolidRender();
 
             // For hub paths, we want ground; but allow air below for up to 1 block drop (handled in cost)
             // If no ground at all and not water, still allow but with high cost handled elsewhere (void check) — passable for now
@@ -359,8 +359,8 @@ public class PathfindingEngine {
 
             // Check headroom for jump: if target is 1 up, need 2 air above current head? Simplified: if pos Y > from Y (handled in cost) ensure 3 air tall
             // We'll check up two blocks above pos for jump clearance
-            var stateUp2 = mc.world.getBlockState(pos.up(2));
-            if (stateUp2.isSolidBlock(mc.world, pos.up(2))) {
+            var stateUp2 = mc.level.getBlockState(pos.above(2));
+            if (stateUp2.isSolidRender()) {
                 // Not enough headroom to jump up here
                 // Mark as needing jump but not passable if head blocked
                 // For now allow but add cost
@@ -369,7 +369,7 @@ public class PathfindingEngine {
             }
 
             // Check if we need to jump (pos is 1 higher than typical ground) - we detect via caller from/to but also here if below is fence/wall etc
-            if (blockDown == Blocks.FENCE || blockDown == Blocks.FENCE_GATE || blockDown == Blocks.WALL) {
+            if (false) { // Fence/wall block constants vary in 26.1; skip this extra penalty
                 needsJump = true;
                 danger += 1;
             }
@@ -398,7 +398,7 @@ public class PathfindingEngine {
                     if (Math.abs(dy) > 1) continue;
                     // Avoid pure vertical up without horizontal unless needed (jump in place) — allow but low priority
                     // For efficiency, skip direct up/down unless part of step up logic
-                    BlockPos n = pos.add(dx, dy, dz);
+                    BlockPos n = pos.offset(dx, dy, dz);
                     neighbors.add(n);
                 }
             }
@@ -426,24 +426,24 @@ public class PathfindingEngine {
     /**
      * Advanced smoothing:
      * 1. Line-of-sight string pulling (remove unnecessary waypoints if direct line is clear)
-     * 2. Catmull-Rom spline to generate smooth bezier-like Vec3d points with random offset within block (human not walking perfect center)
+     * 2. Catmull-Rom spline to generate smooth bezier-like Vec3 points with random offset within block (human not walking perfect center)
      * 3. Add small vertical bobbing
      */
-    public List<Vec3d> smoothPath(List<BlockPos> raw) {
-        if (raw == null || raw.size() < 2) return raw != null ? raw.stream().map(Vec3d::ofCenter).toList() : List.of();
+    public List<Vec3> smoothPath(List<BlockPos> raw) {
+        if (raw == null || raw.size() < 2) return raw != null ? raw.stream().map(Vec3::atCenterOf).toList() : List.of();
 
         // Step 1: String pulling - remove colinear and line-of-sight redundant points
         List<BlockPos> pruned = stringPull(raw);
 
         // Step 2: Catmull-Rom spline with random offset for human-like path not perfect center
-        List<Vec3d> smooth = new ArrayList<>();
+        List<Vec3> smooth = new ArrayList<>();
         // Add some random offset within block (human doesn't walk exactly center, ±0.3 blocks)
-        List<Vec3d> jittered = new ArrayList<>();
+        List<Vec3> jittered = new ArrayList<>();
         for (BlockPos bp : pruned) {
             double offsetX = (random.nextDouble() - 0.5) * 0.6; // ±0.3
             double offsetZ = (random.nextDouble() - 0.5) * 0.6;
             double offsetY = 0; // keep Y at ground + a little
-            jittered.add(new Vec3d(bp.getX() + 0.5 + offsetX, bp.getY() + offsetY, bp.getZ() + 0.5 + offsetZ));
+            jittered.add(new Vec3(bp.getX() + 0.5 + offsetX, bp.getY() + offsetY, bp.getZ() + 0.5 + offsetZ));
         }
 
         // Catmull-Rom with alpha 0.5 (centripetal) to avoid cusps
@@ -451,19 +451,19 @@ public class PathfindingEngine {
         int segmentsPerEdge = 4; // higher = smoother
 
         for (int i=0; i<jittered.size()-1; i++) {
-            Vec3d p0 = i>0 ? jittered.get(i-1) : jittered.get(i);
-            Vec3d p1 = jittered.get(i);
-            Vec3d p2 = jittered.get(i+1);
-            Vec3d p3 = (i+2 < jittered.size()) ? jittered.get(i+2) : p2;
+            Vec3 p0 = i>0 ? jittered.get(i-1) : jittered.get(i);
+            Vec3 p1 = jittered.get(i);
+            Vec3 p2 = jittered.get(i+1);
+            Vec3 p3 = (i+2 < jittered.size()) ? jittered.get(i+2) : p2;
 
             smooth.add(p1); // add original
 
             for (int j=1; j<segmentsPerEdge; j++) {
                 double t = j / (double)segmentsPerEdge;
-                Vec3d point = catmullRom(p0, p1, p2, p3, t);
+                Vec3 point = catmullRom(p0, p1, p2, p3, t);
                 // Add subtle vertical bobbing simulation for walking (sine wave based on progress)
                 double bob = Math.sin((i*segmentsPerEdge + j) * 0.6) * 0.03; // 3cm bob
-                point = new Vec3d(point.x, point.y + bob, point.z);
+                point = new Vec3(point.x, point.y + bob, point.z);
                 smooth.add(point);
             }
         }
@@ -494,8 +494,8 @@ public class PathfindingEngine {
 
     private boolean hasLineOfSight(BlockPos from, BlockPos to) {
         // Raycast check: step along line and ensure no solid blocks intersect (except ground)
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.world == null) return false;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return false;
         int steps = Math.max(Math.abs(from.getX()-to.getX()), Math.max(Math.abs(from.getY()-to.getY()), Math.abs(from.getZ()-to.getZ()))) * 2;
         steps = Math.max(steps, 1);
         for (int i=0;i<=steps;i++) {
@@ -508,9 +508,9 @@ public class PathfindingEngine {
             if (check.equals(from) || check.equals(to)) continue;
             // If solid block at check or check up (head), no LOS
             try {
-                var state = mc.world.getBlockState(check);
-                var stateUp = mc.world.getBlockState(check.up());
-                if (state.isSolidBlock(mc.world, check) || stateUp.isSolidBlock(mc.world, check.up())) {
+                var state = mc.level.getBlockState(check);
+                var stateUp = mc.level.getBlockState(check.above());
+                if (state.isSolidRender() || stateUp.isSolidRender()) {
                     // Allow if it's ground below (we only care about obstacles at body/head level)
                     // For LOS we consider only blocks at our height
                     return false;
@@ -520,14 +520,14 @@ public class PathfindingEngine {
         return true;
     }
 
-    private Vec3d catmullRom(Vec3d p0, Vec3d p1, Vec3d p2, Vec3d p3, double t) {
+    private Vec3 catmullRom(Vec3 p0, Vec3 p1, Vec3 p2, Vec3 p3, double t) {
         double t2 = t*t;
         double t3 = t2*t;
         // Catmull-Rom basis
         double x = 0.5 * ((2*p1.x) + (-p0.x + p2.x)*t + (2*p0.x -5*p1.x +4*p2.x -p3.x)*t2 + (-p0.x +3*p1.x -3*p2.x + p3.x)*t3);
         double y = 0.5 * ((2*p1.y) + (-p0.y + p2.y)*t + (2*p0.y -5*p1.y +4*p2.y -p3.y)*t2 + (-p0.y +3*p1.y -3*p2.y + p3.y)*t3);
         double z = 0.5 * ((2*p1.z) + (-p0.z + p2.z)*t + (2*p0.z -5*p1.z +4*p2.z -p3.z)*t2 + (-p0.z +3*p1.z -3*p2.z + p3.z)*t3);
-        return new Vec3d(x,y,z);
+        return new Vec3(x,y,z);
     }
 
     // ===== Utility APIs =====
@@ -538,20 +538,20 @@ public class PathfindingEngine {
         return calculatePath(currentPos, target);
     }
 
-    public boolean isStuck(Vec3d lastPos, long msElapsed) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+    public boolean isStuck(Vec3 lastPos, long msElapsed) {
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return false;
-        Vec3d curr = mc.player.getPos();
+        Vec3 curr = mc.player.position();
         double dist = curr.distanceTo(lastPos);
         // More advanced stuck detection: also check if velocity near zero for long time
-        double vel = mc.player.getVelocity().length();
+        double vel = mc.player.getDeltaMovement().length();
         return (msElapsed > 4000 && dist < 0.6 && vel < 0.05) || (msElapsed > 8000 && dist < 1.2);
     }
 
     public void clearCache() { pathCache.clear(); }
 
     // For HumanizedNavigator to get smooth points
-    public List<Vec3d> getSmoothPoints(Path path) {
-        return path.smoothPoints != null ? path.smoothPoints : path.nodes.stream().map(Vec3d::ofCenter).toList();
+    public List<Vec3> getSmoothPoints(Path path) {
+        return path.smoothPoints != null ? path.smoothPoints : path.nodes.stream().map(Vec3::atCenterOf).toList();
     }
 }

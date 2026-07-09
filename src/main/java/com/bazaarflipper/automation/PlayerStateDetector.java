@@ -3,8 +3,8 @@ package com.bazaarflipper.automation;
 import com.bazaarflipper.config.PlayerCapabilityConfig;
 import com.bazaarflipper.util.ChatUtils;
 import com.bazaarflipper.util.Logger;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.PlayerListEntry;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.PlayerInfo;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -23,14 +23,14 @@ public class PlayerStateDetector {
     }
 
     public PlayerCapabilityConfig.HypixelRank detectRank() {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.getNetworkHandler() == null || mc.player == null) return PlayerCapabilityConfig.HypixelRank.NONE;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.getConnection() == null || mc.player == null) return PlayerCapabilityConfig.HypixelRank.NONE;
         try {
             // Parse from tab list: format [MVP+], [VIP] etc
-            Collection<PlayerListEntry> entries = mc.getNetworkHandler().getPlayerList();
-            for (PlayerListEntry entry : entries) {
-                if (entry.getProfile() != null && entry.getProfile().getId().equals(mc.player.getUuid())) {
-                    String display = entry.getDisplayName() != null ? ChatUtils.stripColorCodes(entry.getDisplayName().getString()) : "";
+            Collection<PlayerInfo> entries = mc.getConnection().getOnlinePlayers();
+            for (PlayerInfo entry : entries) {
+                if (entry.getProfile() != null && entry.getProfile().id().equals(mc.player.getUUID())) {
+                    String display = entry.getTabListDisplayName() != null ? ChatUtils.stripColorCodes(entry.getTabListDisplayName().getString()) : "";
                     // Also check tab list name via stripped color
                     if (display.contains("MVP++")) return PlayerCapabilityConfig.HypixelRank.MVP_PLUS_PLUS;
                     if (display.contains("MVP+")) return PlayerCapabilityConfig.HypixelRank.MVP_PLUS;
@@ -60,11 +60,7 @@ public class PlayerStateDetector {
         // Buff display: scoreboard or tab? Cookie active shows remaining time?
         // For simplicity, check scoreboard for "Cookie buff"
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.world == null) return 0;
-            var scoreboard = mc.world.getScoreboard();
-            var objective = scoreboard.getObjectiveForSlot(net.minecraft.scoreboard.ScoreboardDisplaySlot.SIDEBAR);
-            if (objective == null) return 0;
+            if (ChatUtils.getSidebarLines().isEmpty()) return 0;
             // Check all lines for cookie indicator? Hypixel shows "Bits" or "Cookie" buff elsewhere
             // Placeholder: assume cookie active if scoreboard has "Bits: "?
             // Actually cookie status better detected via tab list buffs or player buffs

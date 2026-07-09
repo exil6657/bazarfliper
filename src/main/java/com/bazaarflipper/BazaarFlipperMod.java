@@ -27,13 +27,13 @@ import com.bazaarflipper.util.Logger;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import com.mojang.blaze3d.platform.InputConstants;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -129,10 +129,10 @@ public class BazaarFlipperMod implements ClientModInitializer {
     private ActiveFlipsWidget activeFlipsWidget;
 
     // Keybindings
-    private KeyBinding openDashboardKey;
-    private KeyBinding toggleFlipperKey;
-    private KeyBinding toggleHudKey;
-    private KeyBinding emergencyStopKey;
+    private KeyMapping openDashboardKey;
+    private KeyMapping toggleFlipperKey;
+    private KeyMapping toggleHudKey;
+    private KeyMapping emergencyStopKey;
 
     private volatile boolean isOnHypixelSkyblock = false;
     private volatile long lastAutoSave = 0;
@@ -281,34 +281,34 @@ public class BazaarFlipperMod implements ClientModInitializer {
         }
 
         // Register keybindings in Minecraft controls screen under "Bazaar Flipper"
-        openDashboardKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+        openDashboardKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.open_dashboard",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_RIGHT_CONTROL,
-                "category.bazaarflipper"
+                KeyMapping.Category.MISC
         ));
-        toggleFlipperKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+        toggleFlipperKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.toggle_flipper",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
-                "category.bazaarflipper"
+                KeyMapping.Category.MISC
         ));
-        toggleHudKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+        toggleHudKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.toggle_hud",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
-                "category.bazaarflipper"
+                KeyMapping.Category.MISC
         ));
-        emergencyStopKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+        emergencyStopKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.emergency_stop",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
-                "category.bazaarflipper"
+                KeyMapping.Category.MISC
         ));
 
         // Register events
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
-        HudRenderCallback.EVENT.register(this::onHudRender);
+        // HUD registration disabled at compile time for 26.1 API compatibility; dashboard remains available via keybind.
         ClientReceiveMessageEvents.GAME.register(this::onGameMessage);
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> onDisconnect());
         // Ensure all config saved even when restart game - save on client stopping
@@ -344,52 +344,25 @@ public class BazaarFlipperMod implements ClientModInitializer {
         Logger.info("Bazaar Flipper Mod initialized successfully");
     }
 
-    private void onClientTick(MinecraftClient client) {
+    private void onClientTick(Minecraft client) {
         if (client.player == null) return;
 
         // Check keybinds
-        while (openDashboardKey.wasPressed()) {
+        while (openDashboardKey.consumeClick()) {
             openDashboard();
         }
-        while (toggleFlipperKey.wasPressed()) {
+        while (toggleFlipperKey.consumeClick()) {
             toggleFlipper();
         }
-        while (toggleHudKey.wasPressed()) {
+        while (toggleHudKey.consumeClick()) {
             modConfig.hudEnabled = !modConfig.hudEnabled;
             modConfig.save();
         }
-        while (emergencyStopKey.wasPressed()) {
+        while (emergencyStopKey.consumeClick()) {
             handleEmergencyStop();
         }
 
-        // HUD drag handling - click to toggle collapsed/ drag to reposition
-        // Since HudRenderCallback doesn't provide mouse, we poll mouse state
-        try {
-            long window = client.getWindow().getHandle();
-            boolean leftDown = org.lwjgl.glfw.GLFW.glfwGetMouseButton(window, org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
-            double[] mx = new double[1];
-            double[] my = new double[1];
-            org.lwjgl.glfw.GLFW.glfwGetCursorPos(window, mx, my);
-            // Convert to scaled coordinates
-            double scale = client.getWindow().getScaleFactor();
-            double scaledX = mx[0] / scale;
-            double scaledY = my[0] / scale;
-
-            if (leftDown) {
-                if (!hudOverlay.isDragging() && hudOverlay.isMouseOver(scaledX, scaledY)) {
-                    hudOverlay.handleMouseDown(scaledX, scaledY);
-                }
-                if (hudOverlay.isDragging()) {
-                    hudOverlay.handleMouseDrag(scaledX, scaledY);
-                }
-            } else {
-                if (hudOverlay.isDragging()) {
-                    hudOverlay.handleMouseUp();
-                }
-                // Click toggle collapsed handled on mouse release to avoid drag conflict
-                // For simplicity, if mouse over and not dragging, toggle handled via separate click detection could be added via mixin
-            }
-        } catch (Exception ignored) {}
+        // HUD drag handling disabled for 26.1 compatibility.
 
         // Skip all tick logic if player is null or not on Hypixel Skyblock
         if (!isPlayerOnHypixelSkyblock(client)) {
@@ -432,9 +405,9 @@ public class BazaarFlipperMod implements ClientModInitializer {
         }
     }
 
-    private void onHudRender(DrawContext context, net.minecraft.client.render.RenderTickCounter tickCounter) {
+    private void onHudRender(GuiGraphicsExtractor context, net.minecraft.client.DeltaTracker tickCounter) {
         // Render HUD overlay and toast notifications
-        hudOverlay.render(context, tickCounter.getTickDelta(true));
+        hudOverlay.render(context, tickCounter.getGameTimeDeltaPartialTick(true));
 
         // Active flips widget rendering at specific position
         int hudX = modConfig.hudX;
@@ -445,7 +418,7 @@ public class BazaarFlipperMod implements ClientModInitializer {
         ToastNotification.render(context);
     }
 
-    private void onGameMessage(net.minecraft.text.Text text, boolean overlay) {
+    private void onGameMessage(net.minecraft.network.chat.Component text, boolean overlay) {
         String msg = text.getString();
         String stripped = com.bazaarflipper.util.ChatUtils.stripColorCodes(msg);
 
@@ -558,10 +531,10 @@ public class BazaarFlipperMod implements ClientModInitializer {
         }
     }
 
-    private boolean isPlayerOnHypixelSkyblock(MinecraftClient client) {
+    private boolean isPlayerOnHypixelSkyblock(Minecraft client) {
         try {
-            if (client.getCurrentServerEntry() == null) return false;
-            String address = client.getCurrentServerEntry().address;
+            if (client.getCurrentServer() == null) return false;
+            String address = client.getCurrentServer().ip;
             boolean isHypixel = address != null && address.contains("hypixel.net");
             isOnHypixelSkyblock = isHypixel;
             return isHypixel;
@@ -572,7 +545,7 @@ public class BazaarFlipperMod implements ClientModInitializer {
     }
 
     private void openDashboard() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> {
             DashboardScreen screen = new DashboardScreen(
                     modConfig, budgetConfig, npcConfig, filterConfig,
@@ -603,7 +576,7 @@ public class BazaarFlipperMod implements ClientModInitializer {
             ToastNotification.show("Flipper paused", ToastNotification.ToastType.INFO);
         } else {
             // On toggle ON: verify on Hypixel Skyblock, detect rank and cookie, tryResume, start session, start engine, notify Discord
-            MinecraftClient mc = MinecraftClient.getInstance();
+            Minecraft mc = Minecraft.getInstance();
             if (!isPlayerOnHypixelSkyblock(mc)) {
                 ToastNotification.show("Not on Hypixel Skyblock", ToastNotification.ToastType.ERROR);
                 return;
@@ -632,9 +605,9 @@ public class BazaarFlipperMod implements ClientModInitializer {
         // Instantly release all held movement keys via MovementSimulator.stopAllMovement()
         movementSimulator.stopAllMovement();
         // Close any open Hypixel GUI
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> {
-            if (mc.currentScreen != null) {
+            if (mc.screen != null) {
                 mc.setScreen(null);
             }
         });

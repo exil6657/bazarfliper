@@ -2,8 +2,8 @@ package com.bazaarflipper.ui;
 
 import com.bazaarflipper.engine.OrderManager;
 import com.bazaarflipper.util.ColorUtils;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.Minecraft;
 
 public class OrderStatusWidget {
 
@@ -13,8 +13,8 @@ public class OrderStatusWidget {
         this.orderManager = orderManager;
     }
 
-    public void render(DrawContext context, int x, int y, int width, int height) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+    public void render(GuiGraphicsExtractor context, int x, int y, int width, int height) {
+        Minecraft mc = Minecraft.getInstance();
         context.fill(x, y, x+width, y+height, ColorUtils.PANEL_BG);
         context.fill(x-1, y-1, x+width+1, y+height+1, ColorUtils.PANEL_BORDER);
 
@@ -22,11 +22,11 @@ public class OrderStatusWidget {
         for (var entry : orderManager.getAllActiveOrders().entrySet()) {
             String productId = entry.getKey();
             OrderManager.ActiveOrder order = entry.getValue();
-            context.drawText(mc.textRenderer, productId, x+5, rowY, ColorUtils.ITEM_NAME, false);
+            context.text(mc.font, productId, x+5, rowY, ColorUtils.ITEM_NAME, false);
             String status = order.staleStatus.name();
-            context.drawText(mc.textRenderer, status, x+100, rowY, ColorUtils.SECONDARY_TEXT, false);
+            context.text(mc.font, status, x+100, rowY, ColorUtils.SECONDARY_TEXT, false);
             String fill = String.format("%.0f%%", order.fillPercentage*100);
-            context.drawText(mc.textRenderer, fill, x+150, rowY, ColorUtils.PRIMARY_TEXT, false);
+            context.text(mc.font, fill, x+150, rowY, ColorUtils.PRIMARY_TEXT, false);
 
             // Progress bar
             context.fill(x+5, rowY+10, x+width-5, rowY+13, ColorUtils.PROGRESS_BG);

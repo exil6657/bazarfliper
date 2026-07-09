@@ -207,14 +207,14 @@ public class WorldStateRecovery {
             }
 
             if (locationValidator.getCurrentWorldState() == WorldState.SKYBLOCK_HUB) {
-                // Wait for full world load: mc.player non-null, mc.world non-null, position stable, min 3 second wait
+                // Wait for full world load: mc.player non-null, mc.level non-null, position stable, min 3 second wait
                 Thread.sleep(3000);
                 // Additional check: player and world stable
                 int attempts = 0;
                 while (attempts < 10) {
                     try {
-                        net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
-                        if (mc.player != null && mc.world != null) {
+                        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                        if (mc.player != null && mc.level != null) {
                             // Position stable check: small movement? Simplified: wait
                             Thread.sleep(500);
                             break;

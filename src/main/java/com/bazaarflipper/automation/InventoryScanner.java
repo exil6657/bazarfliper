@@ -1,32 +1,21 @@
 package com.bazaarflipper.automation;
 
 import com.bazaarflipper.util.ChatUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.item.ItemStack;
-import net.minecraft.scoreboard.Scoreboard;
-import net.minecraft.scoreboard.ScoreboardDisplaySlot;
-import net.minecraft.scoreboard.ScoreboardObjective;
-import net.minecraft.scoreboard.ScoreboardScore;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.item.ItemStack;
 
 public class InventoryScanner {
 
     public double getPurseBalance() {
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.world == null) return 0;
-            Scoreboard scoreboard = mc.world.getScoreboard();
-            ScoreboardObjective objective = scoreboard.getObjectiveForSlot(ScoreboardDisplaySlot.SIDEBAR);
-            if (objective == null) return 0;
-            for (ScoreboardScore score : scoreboard.getAllPlayerScores(objective)) {
-                if (score.getPlayerName() == null) continue;
-                String line = ChatUtils.stripColorCodes(score.getPlayerName().getString());
+            for (String rawLine : ChatUtils.getSidebarLines()) {
+                String line = ChatUtils.stripColorCodes(rawLine);
                 if (line.contains("Purse:")) {
                     // Format: "Purse: 1,234,567 Coins"
                     String stripped = line.replace("Purse:", "").replace("Coins", "").replace(",", "").trim();
                     try {
                         return Double.parseDouble(stripped);
                     } catch (NumberFormatException e) {
-                        // Try to extract number via regex
                         String num = stripped.replaceAll("[^0-9.]", "");
                         if (!num.isEmpty()) return Double.parseDouble(num);
                     }
@@ -60,7 +49,7 @@ public class InventoryScanner {
             // In 26.1.2, lore is in DataComponents? We'll use generic approach
             // This would require checking stack's custom name and lore via DataComponentTypes.LORE
             // For spec compliance, note we parse via lore text - actual implementation would fetch tooltip
-            var loreComponent = stack.get(net.minecraft.component.DataComponentTypes.LORE);
+            var loreComponent = stack.get(net.minecraft.core.component.DataComponents.LORE);
             if (loreComponent != null) {
                 for (var line : loreComponent.lines()) {
                     String text = ChatUtils.stripColorCodes(line.getString());
@@ -102,13 +91,13 @@ public class InventoryScanner {
     }
 
     public ItemStack findItemInInventory(String productId) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return ItemStack.EMPTY;
-        for (int i = 0; i < mc.player.getInventory().size(); i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+        for (int i = 0; i < mc.player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (stack.isEmpty()) continue;
             // Check if matches productId - simplified by name
-            String display = stack.getName().getString().toLowerCase();
+            String display = stack.getHoverName().getString().toLowerCase();
             if (display.contains(productId.toLowerCase().replace('_', ' '))) {
                 return stack;
             }
@@ -117,13 +106,13 @@ public class InventoryScanner {
     }
 
     public int countItemInInventory(String productId) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return 0;
         int count = 0;
-        for (int i = 0; i < mc.player.getInventory().size(); i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+        for (int i = 0; i < mc.player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (stack.isEmpty()) continue;
-            String display = stack.getName().getString().toLowerCase();
+            String display = stack.getHoverName().getString().toLowerCase();
             if (display.contains(productId.toLowerCase().replace('_', ' '))) {
                 count += stack.getCount();
             }
@@ -132,8 +121,8 @@ public class InventoryScanner {
     }
 
     public boolean isInventoryFull() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return false;
-        return mc.player.getInventory().getEmptySlot() == -1;
+        return mc.player.getInventory().getFreeSlot() == -1;
     }
 }

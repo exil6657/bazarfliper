@@ -2,12 +2,12 @@ package com.bazaarflipper.automation;
 
 import com.bazaarflipper.util.Logger;
 import com.bazaarflipper.util.MathUtils;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 /**
  * Two distinct methods:
  * - sendCommand -> real server command via networkHandler.sendCommand()
- * - sendChatMessage -> chat via networkHandler.sendChatMessage() for bazaar search and price input
+ * - sendChatMessage -> chat via networkHandler.sendChat() for bazaar search and price input
  *
  * All server-bound messages: randomized human-like delays, no mod identifiers, never in same tick as GUI state changes.
  */
@@ -21,8 +21,8 @@ public class ChatCommandSender {
     }
 
     public void sendCommand(String command) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.getNetworkHandler() == null) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.getConnection() == null) return;
 
         // Ensure not same tick as GUI state changes: wait random delay
         long now = System.currentTimeMillis();
@@ -43,16 +43,18 @@ public class ChatCommandSender {
         String cleanCommand = command.startsWith("/") ? command.substring(1) : command;
         Logger.info("Sending command: /" + cleanCommand);
         mc.execute(() -> {
-            if (mc.getNetworkHandler() != null) {
-                mc.getNetworkHandler().sendCommand(cleanCommand);
+            if (mc.getConnection() != null) {
+                mc.getConnection().sendCommand(cleanCommand);
             }
         });
         lastCommandTime = System.currentTimeMillis();
     }
 
+    public void sendChat(String message) { sendChatMessage(message); }
+
     public void sendChatMessage(String message) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.getNetworkHandler() == null) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.getConnection() == null) return;
 
         // Randomized delay
         try {
@@ -63,8 +65,8 @@ public class ChatCommandSender {
 
         Logger.info("Sending chat message: " + message);
         mc.execute(() -> {
-            if (mc.getNetworkHandler() != null) {
-                mc.getNetworkHandler().sendChatMessage(message);
+            if (mc.getConnection() != null) {
+                mc.getConnection().sendChat(message);
             }
         });
         lastCommandTime = System.currentTimeMillis();

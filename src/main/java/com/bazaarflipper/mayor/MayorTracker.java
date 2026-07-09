@@ -3,9 +3,8 @@ package com.bazaarflipper.mayor;
 import com.bazaarflipper.api.MayorAPIClient;
 import com.bazaarflipper.util.ChatUtils;
 import com.bazaarflipper.util.Logger;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.scoreboard.*;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.PlayerInfo;
 
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
@@ -84,16 +83,9 @@ public class MayorTracker {
 
     public void detectFromScoreboard() {
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.world == null) return;
-            Scoreboard scoreboard = mc.world.getScoreboard();
-            ScoreboardObjective objective = scoreboard.getObjectiveForSlot(ScoreboardDisplaySlot.SIDEBAR);
-            if (objective == null) return;
-
-            for (ScoreboardScore score : scoreboard.getAllPlayerScores(objective)) {
-                String line = ChatUtils.stripColorCodes(score.getPlayerName() != null ? score.getPlayerName().getString() : "");
+            for (String rawLine : ChatUtils.getSidebarLines()) {
+                String line = ChatUtils.stripColorCodes(rawLine);
                 if (line.contains("Mayor")) {
-                    // Parse mayor name from line like "Mayor: Derpy"
                     String[] parts = line.split(":");
                     if (parts.length == 2) {
                         String maybeMayor = parts[1].trim();
@@ -114,11 +106,11 @@ public class MayorTracker {
 
     public void detectFromTabList() {
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.getNetworkHandler() == null) return;
-            Collection<PlayerListEntry> entries = mc.getNetworkHandler().getPlayerList();
-            for (PlayerListEntry entry : entries) {
-                String display = ChatUtils.stripColorCodes(entry.getDisplayName() != null ? entry.getDisplayName().getString() : "");
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.getConnection() == null) return;
+            Collection<PlayerInfo> entries = mc.getConnection().getOnlinePlayers();
+            for (PlayerInfo entry : entries) {
+                String display = ChatUtils.stripColorCodes(entry.getTabListDisplayName() != null ? entry.getTabListDisplayName().getString() : "");
                 if (display.contains("Mayor")) {
                     // Similar parse
                 }

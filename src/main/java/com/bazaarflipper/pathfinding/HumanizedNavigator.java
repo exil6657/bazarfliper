@@ -3,10 +3,10 @@ package com.bazaarflipper.pathfinding;
 import com.bazaarflipper.automation.DelayManager;
 import com.bazaarflipper.util.MathUtils;
 import com.bazaarflipper.util.Logger;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 import java.util.Random;
@@ -45,7 +45,7 @@ public class HumanizedNavigator {
     private int currentSmoothIndex = 0; // index into smoothPoints
     private int currentNodeIndex = 0; // fallback to raw nodes if smooth empty
 
-    private Vec3d lastPos = Vec3d.ZERO;
+    private Vec3 lastPos = Vec3.ZERO;
     private long lastPosTime = 0;
     private long thinkingPauseUntil = 0;
     private float yawNoise = 0;
@@ -70,7 +70,7 @@ public class HumanizedNavigator {
     private static final int LOOK_AHEAD_POINTS = 3;
 
     // Social avoidance
-    private Vec3d avoidanceVector = Vec3d.ZERO;
+    private Vec3 avoidanceVector = Vec3.ZERO;
     private long avoidanceUntil = 0;
 
     private BlockPos targetBlockPos;
@@ -96,12 +96,12 @@ public class HumanizedNavigator {
         }
         targetWaypoint = wp;
         targetBlockPos = new BlockPos((int) wp.x, (int) wp.y, (int) wp.z);
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             state = NavigationState.FAILED;
             return;
         }
-        BlockPos start = mc.player.getBlockPos();
+        BlockPos start = mc.player.blockPosition();
         state = NavigationState.CALCULATING;
 
         long calcStart = System.currentTimeMillis();
@@ -113,7 +113,7 @@ public class HumanizedNavigator {
         try { Thread.sleep(planningDelay); } catch (InterruptedException ignored) {}
 
         if (!currentPath.success && !currentPath.partial) {
-            Logger.warn("Failed to calculate path to " + waypointName + " (target " + targetBlockPos + ")", new Exception("Pathfinding failed"));
+            Logger.warn("Failed to calculate path to " + waypointName + " (target " + targetBlockPos + "): Pathfinding failed");
             state = NavigationState.FAILED;
             return;
         }
@@ -123,7 +123,7 @@ public class HumanizedNavigator {
 
         currentSmoothIndex = 0;
         currentNodeIndex = 0;
-        lastPos = mc.player.getPos();
+        lastPos = mc.player.position();
         lastPosTime = System.currentTimeMillis();
         continuousWalkStart = System.currentTimeMillis();
         fatigueLevel = 0;
@@ -135,36 +135,36 @@ public class HumanizedNavigator {
 
     public void tick() {
         if (state != NavigationState.WALKING) return;
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             state = NavigationState.FAILED;
             return;
         }
 
         long now = System.currentTimeMillis();
-        Vec3d playerPos = mc.player.getPos();
+        Vec3 playerPos = mc.player.position();
 
         // ===== Arrival Check with overshoot logic =====
         if (targetWaypoint != null) {
-            Vec3d targetVec = new Vec3d(targetWaypoint.x, targetWaypoint.y, targetWaypoint.z);
+            Vec3 targetVec = new Vec3(targetWaypoint.x, targetWaypoint.y, targetWaypoint.z);
             double dist = playerPos.distanceTo(targetVec);
             if (dist <= targetWaypoint.arrivalRadius) {
                 // 30% chance arrival overshoot 0.5-1.5 blocks then walk back (human)
                 if (random.nextFloat() < 0.3) {
                     double overshootDist = MathUtils.randomDouble(0.5, 1.5);
-                    Vec3d overshootDir = playerPos.subtract(targetVec).normalize().multiply(overshootDist);
+                    Vec3 overshootDir = playerPos.subtract(targetVec).normalize().scale(overshootDist);
                     if (overshootDir.length() < 0.1) {
                         // Random direction if directly on target
                         double angle = random.nextDouble() * Math.PI * 2;
-                        overshootDir = new Vec3d(Math.cos(angle)*overshootDist, 0, Math.sin(angle)*overshootDist);
+                        overshootDir = new Vec3(Math.cos(angle)*overshootDist, 0, Math.sin(angle)*overshootDist);
                     }
-                    Vec3d overshootTarget = targetVec.add(overshootDir);
+                    Vec3 overshootTarget = targetVec.add(overshootDir);
                     // Walk to overshoot then back
                     movementSimulator.pressForward(true);
                     double dx = overshootTarget.x - playerPos.x;
                     double dz = overshootTarget.z - playerPos.z;
                     float yaw = (float)Math.toDegrees(Math.atan2(dz, dx)) - 90f;
-                    movementSimulator.setYaw(yaw + MathUtils.randomInt(-3,3), 4f);
+                    movementSimulator.setYRot(yaw + MathUtils.randomInt(-3,3), 4f);
                     // After short delay, will detect still within radius but overshoot logic will then trigger arrival on next tick 70% of time
                     if (random.nextFloat() < 0.5) {
                         // Continue overshoot for a bit
@@ -191,11 +191,11 @@ public class HumanizedNavigator {
 
         // ===== Dynamic Replan: if deviated >2 blocks from current path, recalc =====
         if (currentPath != null && currentPath.smoothPoints != null && currentSmoothIndex < currentPath.smoothPoints.size()) {
-            Vec3d expected = currentPath.smoothPoints.get(currentSmoothIndex);
+            Vec3 expected = currentPath.smoothPoints.get(currentSmoothIndex);
             double deviation = playerPos.distanceTo(expected);
             if (deviation > 3.0) {
                 Logger.info("Deviated " + String.format("%.2f", deviation) + " blocks from path, replanning");
-                BlockPos currentBlock = mc.player.getBlockPos();
+                BlockPos currentBlock = mc.player.blockPosition();
                 currentPath = pathfindingEngine.recalculatePath(currentBlock, targetBlockPos);
                 currentSmoothIndex = 0;
                 if (!currentPath.success && !currentPath.partial) {
@@ -211,7 +211,7 @@ public class HumanizedNavigator {
             // During thinking pause, occasionally look around (human)
             if (random.nextFloat() < 0.02) {
                 float yawChange = MathUtils.randomInt(-15,15);
-                movementSimulator.setYaw(mc.player.getYaw() + yawChange, 2f);
+                movementSimulator.setYRot(mc.player.getYRot() + yawChange, 2f);
             }
             return;
         }
@@ -250,14 +250,14 @@ public class HumanizedNavigator {
             if (random.nextFloat() < 0.4) { // 40% chance to glance
                 Entity interesting = findInterestingEntity();
                 if (interesting != null) {
-                    Vec3d target = interesting.getPos();
+                    Vec3 target = interesting.position();
                     double dx = target.x - playerPos.x;
                     double dz = target.z - playerPos.z;
                     float yawToEntity = (float)Math.toDegrees(Math.atan2(dz, dx)) - 90f;
-                    float currentYaw = mc.player.getYaw();
+                    float currentYaw = mc.player.getYRot();
                     // Quick glance 10-30° towards entity
                     float glanceYaw = MathUtils.lerp(currentYaw, yawToEntity, 0.3f) + MathUtils.randomInt(-5,5);
-                    movementSimulator.setYaw(glanceYaw, MathUtils.randomInt(8,15));
+                    movementSimulator.setYRot(glanceYaw, MathUtils.randomInt(8,15));
                     lastEnvScan = now;
                     // Brief pause to look? 5% chance
                     if (random.nextFloat() < 0.05) {
@@ -274,12 +274,12 @@ public class HumanizedNavigator {
         if (now < avoidanceUntil) {
             // Apply avoidance vector to movement
         } else {
-            Vec3d avoidance = computeAvoidanceVector();
+            Vec3 avoidance = computeAvoidanceVector();
             if (avoidance.length() > 0.1) {
                 avoidanceVector = avoidance;
                 avoidanceUntil = now + MathUtils.randomInt(800, 1500);
             } else {
-                avoidanceVector = Vec3d.ZERO;
+                avoidanceVector = Vec3.ZERO;
             }
         }
 
@@ -289,8 +289,8 @@ public class HumanizedNavigator {
                 float wanderYaw = MathUtils.randomInt(-30,30);
                 float wanderPitch = MathUtils.randomInt(-10,10);
                 // Smooth wander over 0.5-1s via setYaw with speed
-                movementSimulator.setYaw(mc.player.getYaw() + wanderYaw, MathUtils.randomInt(2,5));
-                movementSimulator.setPitch(mc.player.getPitch() + wanderPitch, MathUtils.randomInt(2,5));
+                movementSimulator.setYRot(mc.player.getYRot() + wanderYaw, MathUtils.randomInt(2,5));
+                movementSimulator.setXRot(mc.player.getXRot() + wanderPitch, MathUtils.randomInt(2,5));
             }
             lastCameraWander = now;
         }
@@ -328,8 +328,8 @@ public class HumanizedNavigator {
         }
 
         // ===== Follow Smooth Path with Look-Ahead =====
-        List<Vec3d> smoothPoints = currentPath != null ? pathfindingEngine.getSmoothPoints(currentPath) : null;
-        Vec3d nextTarget;
+        List<Vec3> smoothPoints = currentPath != null ? pathfindingEngine.getSmoothPoints(currentPath) : null;
+        Vec3 nextTarget;
 
         if (smoothPoints != null && !smoothPoints.isEmpty() && currentSmoothIndex < smoothPoints.size()) {
             // Look ahead 2-3 points for more natural steering (human looks ahead, not just immediate)
@@ -361,7 +361,7 @@ public class HumanizedNavigator {
                 return;
             }
             BlockPos nextNode = currentPath.nodes.get(currentNodeIndex);
-            nextTarget = Vec3d.ofCenter(nextNode);
+            nextTarget = Vec3.atCenterOf(nextNode);
             double distanceToNode = playerPos.distanceTo(nextTarget);
             if (distanceToNode < 1.2) {
                 currentNodeIndex++;
@@ -386,12 +386,12 @@ public class HumanizedNavigator {
         float yawWithOvershoot = targetYaw + (float)(overshoot * overshootDecay) + yawNoise;
 
         // Speed factor for yaw: faster turn if large difference, slower for small (human)
-        float yawDiff = Math.abs(yawWithOvershoot - mc.player.getYaw());
+        float yawDiff = Math.abs(yawWithOvershoot - mc.player.getYRot());
         float yawSpeed = yawDiff > 30 ? MathUtils.randomInt(10,15) : MathUtils.randomInt(4,8);
         if (fatigueLevel > 0.6) yawSpeed *= 0.7; // tired turns slower
 
-        movementSimulator.setYaw(yawWithOvershoot, yawSpeed);
-        movementSimulator.setPitch(targetPitch + pitchNoise, 4f);
+        movementSimulator.setYRot(yawWithOvershoot, yawSpeed);
+        movementSimulator.setXRot(targetPitch + pitchNoise, 4f);
 
         // ===== Acceleration Curve =====
         double accelProgress = Math.min(1.0, (now - accelerationStart) / 800.0); // 0.8s to full speed
@@ -417,7 +417,7 @@ public class HumanizedNavigator {
         if (nextTarget.y > playerPos.y + 0.5) {
             if (random.nextInt(4) == 0) { // 0-3 tick variation
                 // Add slight random yaw before jump (human looks up slightly before jump)
-                movementSimulator.setPitch(mc.player.getPitch() - MathUtils.randomInt(2,5), 8f);
+                movementSimulator.setXRot(mc.player.getXRot() - MathUtils.randomInt(2,5), 8f);
                 movementSimulator.jump();
                 accelerationStart = now; // reset acceleration after jump (realistic)
             }
@@ -432,21 +432,21 @@ public class HumanizedNavigator {
 
     private Entity findInterestingEntity() {
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.world == null || mc.player == null) return null;
-            Vec3d playerPos = mc.player.getPos();
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null || mc.player == null) return null;
+            Vec3 playerPos = mc.player.position();
             Entity best = null;
             double bestScore = 0;
-            for (Entity e : mc.world.getEntities()) {
+            for (Entity e : mc.level.entitiesForRendering()) {
                 if (e == mc.player) continue;
-                double dist = e.getPos().distanceTo(playerPos);
+                double dist = e.position().distanceTo(playerPos);
                 if (dist > 8 || dist < 1) continue;
                 double score = 0;
                 // Score based on type: NPCs, chests, players more interesting
-                if (e.isPlayer()) score = 10 - dist;
+                if (e instanceof net.minecraft.world.entity.player.Player) score = 10 - dist;
                 else if (e.getName().getString().toLowerCase().contains("bazaar") || e.getName().getString().toLowerCase().contains("auction") || e.getName().getString().toLowerCase().contains("bank")) {
                     score = 20 - dist;
-                } else if (e.isLiving()) score = 5 - dist*0.5;
+                } else if (e instanceof net.minecraft.world.entity.LivingEntity) score = 5 - dist*0.5;
                 if (score > bestScore) {
                     bestScore = score;
                     best = e;
@@ -456,24 +456,24 @@ public class HumanizedNavigator {
         } catch (Exception e) { return null; }
     }
 
-    private Vec3d computeAvoidanceVector() {
+    private Vec3 computeAvoidanceVector() {
         try {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.world == null || mc.player == null) return Vec3d.ZERO;
-            Vec3d playerPos = mc.player.getPos();
-            Vec3d avoidance = Vec3d.ZERO;
-            for (Entity e : mc.world.getEntities()) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null || mc.player == null) return Vec3.ZERO;
+            Vec3 playerPos = mc.player.position();
+            Vec3 avoidance = Vec3.ZERO;
+            for (Entity e : mc.level.entitiesForRendering()) {
                 if (e == mc.player) continue;
-                if (!e.isPlayer() && !e.isLiving()) continue;
-                double dist = e.getPos().distanceTo(playerPos);
+                if (!(e instanceof net.minecraft.world.entity.player.Player) && !(e instanceof net.minecraft.world.entity.LivingEntity)) continue;
+                double dist = e.position().distanceTo(playerPos);
                 if (dist < 3.0) {
-                    Vec3d away = playerPos.subtract(e.getPos()).normalize();
+                    Vec3 away = playerPos.subtract(e.position()).normalize();
                     double strength = (3.0 - dist) / 3.0 * 0.5;
-                    avoidance = avoidance.add(away.multiply(strength));
+                    avoidance = avoidance.add(away.scale(strength));
                 }
             }
             return avoidance;
-        } catch (Exception e) { return Vec3d.ZERO; }
+        } catch (Exception e) { return Vec3.ZERO; }
     }
 
     public boolean isNavigating() {
@@ -493,7 +493,7 @@ public class HumanizedNavigator {
     }
 
     public void onStuck() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) { state = NavigationState.FAILED; return; }
 
         // Advanced stuck recovery sequence: jump → look around → strafe left → strafe right → back → recalculate → if still stuck, up to 3 attempts then fail
@@ -507,8 +507,8 @@ public class HumanizedNavigator {
             sleep(250);
 
             // 2. Look around randomly (human looks for alternative path when stuck)
-            float randomYaw = mc.player.getYaw() + MathUtils.randomInt(-90,90);
-            movementSimulator.setYaw(randomYaw, 15f);
+            float randomYaw = mc.player.getYRot() + MathUtils.randomInt(-90,90);
+            movementSimulator.setYRot(randomYaw, 15f);
             sleep(300);
 
             // 3. Strafe left
@@ -529,13 +529,13 @@ public class HumanizedNavigator {
             // 6. Try to recalculate with cleared cache to get fresh path
             if (targetBlockPos != null) {
                 pathfindingEngine.clearCache();
-                BlockPos current = mc.player.getBlockPos();
+                BlockPos current = mc.player.blockPosition();
                 currentPath = pathfindingEngine.calculatePath(current, targetBlockPos);
                 if (currentPath.success || currentPath.partial) {
                     currentSmoothIndex = 0;
                     currentNodeIndex = 0;
                     state = NavigationState.WALKING;
-                    lastPos = mc.player.getPos();
+                    lastPos = mc.player.position();
                     lastPosTime = System.currentTimeMillis();
                     accelerationStart = System.currentTimeMillis();
                     currentSpeedFactor = 0;
@@ -557,5 +557,5 @@ public class HumanizedNavigator {
 
     public NavigationState getState() { return state; }
     public double getFatigueLevel() { return fatigueLevel; }
-    public Vec3d getLastPos() { return lastPos; }
+    public Vec3 getLastPos() { return lastPos; }
 }
