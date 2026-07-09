@@ -187,6 +187,55 @@ public class HudOverlay {
         return String.format("%ds", sec);
     }
 
+    // Drag handling
+    private boolean dragging = false;
+    private int dragOffsetX = 0;
+    private int dragOffsetY = 0;
+    private long lastClickTime = 0;
+
+    public boolean isMouseOver(double mouseX, double mouseY) {
+        int panelWidth = collapsed ? 250 : 220;
+        int panelHeight = collapsed ? 20 : 400;
+        return mouseX >= x && mouseX <= x + panelWidth && mouseY >= y && mouseY <= y + panelHeight;
+    }
+
+    // Click to toggle collapsed/expanded
+    public boolean handleClick(double mouseX, double mouseY) {
+        if (!isMouseOver(mouseX, mouseY)) return false;
+        long now = System.currentTimeMillis();
+        // Avoid double handling within 200ms
+        if (now - lastClickTime < 200) return true;
+        lastClickTime = now;
+        // If click near top 30px header, toggle collapsed
+        if (mouseY <= y + 30) {
+            toggleCollapsed();
+            return true;
+        }
+        return false;
+    }
+
+    public boolean handleMouseDown(double mouseX, double mouseY) {
+        if (!isMouseOver(mouseX, mouseY)) return false;
+        // Start drag if not clicking header toggle area? We allow drag from anywhere except header toggle? Simpler: allow drag from anywhere, but click already handled
+        dragging = true;
+        dragOffsetX = (int)(mouseX - x);
+        dragOffsetY = (int)(mouseY - y);
+        return true;
+    }
+
+    public void handleMouseDrag(double mouseX, double mouseY) {
+        if (!dragging) return;
+        int newX = (int)(mouseX - dragOffsetX);
+        int newY = (int)(mouseY - dragOffsetY);
+        setPosition(newX, newY);
+    }
+
+    public void handleMouseUp() {
+        dragging = false;
+    }
+
+    public boolean isDragging() { return dragging; }
+
     public void setPosition(int x, int y) {
         this.x = x; this.y = y;
         config.hudX = x; config.hudY = y;
@@ -200,4 +249,7 @@ public class HudOverlay {
     }
 
     public boolean isCollapsed() { return collapsed; }
+
+    public int getX() { return x; }
+    public int getY() { return y; }
 }

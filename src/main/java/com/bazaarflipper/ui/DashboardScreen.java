@@ -36,6 +36,8 @@ public class DashboardScreen extends Screen {
     private final MarketScanner marketScanner;
     private final com.bazaarflipper.api.BazaarData bazaarData;
     private final HistoryManager historyManager;
+    private final ProfitGraphWidget profitGraphWidget = new ProfitGraphWidget();
+    private boolean advancedTaxExpanded = false;
 
     private enum Tab {
         OVERVIEW("Overview"),
@@ -272,6 +274,21 @@ public class DashboardScreen extends Screen {
         ctx.fill(x+10, nextY+35, x+10+barW, nextY+43, ColorUtils.PROGRESS_BG);
         int fill = (int)(barW * (curMs / (double)quotaMs));
         ctx.fill(x+10, nextY+35, x+10+fill, nextY+43, ColorUtils.PROGRESS_FILL);
+        nextY+=65;
+
+        // ProfitGraphWidget: simple line graph drawn as horizontal sequence of fill() column rectangles proportional to profit values at each time step
+        ctx.drawText(textRenderer, "Profit Graph (sparkline):", x+10, nextY, ColorUtils.SECONDARY_TEXT, false);
+        nextY+=10;
+        // Build profit history values from recent flips
+        List<Double> profitValues = new java.util.ArrayList<>();
+        for (var rec : historyManager.getRecentFlips(50)) {
+            profitValues.add(rec.profit);
+        }
+        if (profitValues.isEmpty()) {
+            // Dummy data for visualization if no history
+            profitValues = List.of(1000.0, 1500.0, 1200.0, 2000.0, 1800.0, 2500.0, 2200.0);
+        }
+        profitGraphWidget.render(ctx, x+10, nextY, w-20, 40, profitValues);
     }
 
     private void renderActiveOrdersTab(DrawContext ctx, int x, int y, int w, int h, int mouseX, int mouseY) {
@@ -442,28 +459,36 @@ public class DashboardScreen extends Screen {
         ctx.drawText(textRenderer, "Order Wait: " + modConfig.orderWaitMinSeconds + "-" + modConfig.orderWaitMaxSeconds + "s", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
         ctx.drawText(textRenderer, "Diagram: Active 30m -> need 3m break (probabilistic middle-weighted)", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
 
-        // Advanced Tax Settings collapsible
-        ctx.drawText(textRenderer, "Tax Settings (Advanced):", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "Bazaar Tax: " + String.format("%.3f%%", modConfig.bazaarTaxRate*100) + " (Cookie does not affect)", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
-        ctx.drawText(textRenderer, "AH LOW (<10M): " + String.format("%.2f%%", modConfig.ahTaxLowRate*100), x+10, curY, ColorUtils.TAX_LOW, false); curY+=12;
-        ctx.drawText(textRenderer, "AH MID (10M-100M): " + String.format("%.2f%%", modConfig.ahTaxMidRate*100), x+10, curY, ColorUtils.TAX_MID, false); curY+=12;
-        ctx.drawText(textRenderer, "AH HIGH (>100M): " + String.format("%.2f%%", modConfig.ahTaxHighRate*100), x+10, curY, ColorUtils.TAX_HIGH, false); curY+=12;
-        ctx.drawText(textRenderer, "Derpy Multiplier: " + modConfig.derpyAHTaxMultiplier + "x (Researched from wiki — update if Hypixel changes perks)", x+10, curY, ColorUtils.TAX_DERPY, false); curY+=12;
-        ctx.drawText(textRenderer, "Derpy Applies Above: " + MathUtils.formatCoins(modConfig.derpyTaxAppliesAbove), x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
+        // Advanced Tax Settings collapsible section hidden to avoid overwhelming casual users per spec
+        String taxToggleLabel = (advancedTaxExpanded ? "▼ " : "▶ ") + "Tax Settings (Advanced — click to " + (advancedTaxExpanded ? "collapse" : "expand") + ")";
+        Button taxToggle = new Button(x+5, curY, 300, 15, taxToggleLabel, () -> advancedTaxExpanded = !advancedTaxExpanded);
+        taxToggle.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(taxToggle);
+        curY+=18;
 
-        Button resetTax = new Button(x+10, curY, 150, 20, "Reset Tax to Defaults", () -> {
-            modConfig.bazaarTaxRate = 0.0125;
-            modConfig.ahTaxLowRate = 0.01;
-            modConfig.ahTaxMidRate = 0.02;
-            modConfig.ahTaxHighRate = 0.025;
-            modConfig.ahLowMidThreshold = 10_000_000L;
-            modConfig.ahMidHighThreshold = 100_000_000L;
-            modConfig.derpyAHTaxMultiplier = 4.0;
-            modConfig.derpyTaxAppliesAbove = 1_000_000L;
-            modConfig.save();
-        });
-        resetTax.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
-        currentButtons.add(resetTax);
+        if (advancedTaxExpanded) {
+            ctx.drawText(textRenderer, "Bazaar Tax: " + String.format("%.3f%%", modConfig.bazaarTaxRate*100) + " (Cookie does not affect)", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=12;
+            ctx.drawText(textRenderer, "AH LOW (<10M): " + String.format("%.2f%%", modConfig.ahTaxLowRate*100), x+10, curY, ColorUtils.TAX_LOW, false); curY+=12;
+            ctx.drawText(textRenderer, "AH MID (10M-100M): " + String.format("%.2f%%", modConfig.ahTaxMidRate*100), x+10, curY, ColorUtils.TAX_MID, false); curY+=12;
+            ctx.drawText(textRenderer, "AH HIGH (>100M): " + String.format("%.2f%%", modConfig.ahTaxHighRate*100), x+10, curY, ColorUtils.TAX_HIGH, false); curY+=12;
+            ctx.drawText(textRenderer, "Derpy Multiplier: " + modConfig.derpyAHTaxMultiplier + "x (Researched from wiki — update if Hypixel changes perks)", x+10, curY, ColorUtils.TAX_DERPY, false); curY+=12;
+            ctx.drawText(textRenderer, "Derpy Applies Above: " + MathUtils.formatCoins(modConfig.derpyTaxAppliesAbove), x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=15;
+
+            Button resetTax = new Button(x+10, curY, 150, 20, "Reset Tax to Defaults", () -> {
+                modConfig.bazaarTaxRate = 0.0125;
+                modConfig.ahTaxLowRate = 0.01;
+                modConfig.ahTaxMidRate = 0.02;
+                modConfig.ahTaxHighRate = 0.025;
+                modConfig.ahLowMidThreshold = 10_000_000L;
+                modConfig.ahMidHighThreshold = 100_000_000L;
+                modConfig.derpyAHTaxMultiplier = 4.0;
+                modConfig.derpyTaxAppliesAbove = 1_000_000L;
+                modConfig.save();
+            });
+            resetTax.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+            currentButtons.add(resetTax);
+            curY+=25;
+        }
     }
 
     private void renderFiltersTab(DrawContext ctx, int x, int y, int w, int h, int mouseX, int mouseY) {

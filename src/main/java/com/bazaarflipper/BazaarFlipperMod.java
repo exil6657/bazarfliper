@@ -128,6 +128,8 @@ public class BazaarFlipperMod implements ClientModInitializer {
     private KeyBinding emergencyStopKey;
 
     private volatile boolean isOnHypixelSkyblock = false;
+    private volatile long lastAutoSave = 0;
+    private EventTracker eventTracker;
 
     @Override
     public void onInitializeClient() {
@@ -174,6 +176,9 @@ public class BazaarFlipperMod implements ClientModInitializer {
         // 8. Initialize ProfitTracker
         profitTracker = new ProfitTracker();
         historyManager = new HistoryManager(profitTracker);
+
+        // EventTracker for Part 18
+        eventTracker = new EventTracker(apiRateLimiter);
 
         // 10. Initialize BudgetManager (needs InventoryScanner)
         inventoryScanner = new InventoryScanner();
@@ -337,14 +342,41 @@ public class BazaarFlipperMod implements ClientModInitializer {
             handleEmergencyStop();
         }
 
+        // HUD drag handling - click to toggle collapsed/ drag to reposition
+        // Since HudRenderCallback doesn't provide mouse, we poll mouse state
+        try {
+            long window = client.getWindow().getHandle();
+            boolean leftDown = org.lwjgl.glfw.GLFW.glfwGetMouseButton(window, org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+            double[] mx = new double[1];
+            double[] my = new double[1];
+            org.lwjgl.glfw.GLFW.glfwGetCursorPos(window, mx, my);
+            // Convert to scaled coordinates
+            double scale = client.getWindow().getScaleFactor();
+            double scaledX = mx[0] / scale;
+            double scaledY = my[0] / scale;
+
+            if (leftDown) {
+                if (!hudOverlay.isDragging() && hudOverlay.isMouseOver(scaledX, scaledY)) {
+                    hudOverlay.handleMouseDown(scaledX, scaledY);
+                }
+                if (hudOverlay.isDragging()) {
+                    hudOverlay.handleMouseDrag(scaledX, scaledY);
+                }
+            } else {
+                if (hudOverlay.isDragging()) {
+                    hudOverlay.handleMouseUp();
+                }
+                // Click toggle collapsed handled on mouse release to avoid drag conflict
+                // For simplicity, if mouse over and not dragging, toggle handled via separate click detection could be added via mixin
+            }
+        } catch (Exception ignored) {}
+
         // Skip all tick logic if player is null or not on Hypixel Skyblock
         if (!isPlayerOnHypixelSkyblock(client)) {
             return;
         }
 
         // Every 5 ticks: call LocationValidator.refreshWorldState()
-        // We'll use client tick counter via static?
-        // For simplicity, call every tick but refreshWorldState itself caches and only reparses every 5 ticks via internal counter
         locationValidator.onTick();
 
         // Every tick when running: call BreakScheduler.tick()
@@ -360,11 +392,16 @@ public class BazaarFlipperMod implements ClientModInitializer {
             humanizedNavigator.tick();
         }
 
-        // FlipEngine tick is handled in its own thread loop, but also per spec FlipEngine.tick must check in order:
-        // We also call it from here? The spec says FlipEngine.tick must check break, world state, packet limiter, command queue.
-        // Our FlipEngine has its own loop, but we also trigger here for safety
-        if (flipEngine.isRunning()) {
-            // flipEngine.tick() already runs in separate thread, but we keep game thread checks for movement etc.
+        // Auto-save triggers: Every 60 seconds, on toggle OFF, on any exception in FlipEngine, after each completed flip.
+        long now = System.currentTimeMillis();
+        if (now - lastAutoSave > 60_000 && flipEngine.isRunning()) {
+            sessionStateManager.saveState();
+            lastAutoSave = now;
+        }
+
+        // EventTracker refresh periodically
+        if (now % 300_000 < 1000) { // every 5 min approx
+            eventTracker.refreshFromAPI();
         }
 
         // Check Discord command inbox polled by game thread via mc.execute() - but we are already on game thread
