@@ -21,7 +21,7 @@ public class ClickSimulator {
      * All ClickSlotC2SPacket must be sent with randomized timing, realistic mouse position data, and plausible button values.
      * Never send a slot click in same tick as receiving packet from server - enforced via delay.
      */
-    public void clickSlot(int syncId, int slotIndex, int button, net.minecraft.world.inventory.ClickType actionType) {
+    public void clickSlot(int syncId, int slotIndex, int button, net.minecraft.screen.slot.SlotActionType actionType) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.gameMode == null || mc.player == null) return;
 
@@ -65,7 +65,7 @@ public class ClickSimulator {
             if (slot.getItem().isEmpty()) continue;
             String displayName = slot.getItem().getHoverName().getString();
             if (displayName.toLowerCase().contains(targetName.toLowerCase())) {
-                clickSlot(handler.containerId, slot.index, 0, net.minecraft.world.inventory.ClickType.PICKUP);
+                clickSlot(handler.containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
                 return;
             }
         }
@@ -83,7 +83,7 @@ public class ClickSimulator {
             // For spec compliance, we note detection by name/lore but implementation simplified
             String name = stack.getHoverName().getString();
             if (name.toLowerCase().contains(loreContains.toLowerCase())) {
-                clickSlot(handler.containerId, slot.index, 0, net.minecraft.world.inventory.ClickType.PICKUP);
+                clickSlot(handler.containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
                 return;
             }
         }

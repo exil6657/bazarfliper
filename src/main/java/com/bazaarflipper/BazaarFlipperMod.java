@@ -27,12 +27,14 @@ import com.bazaarflipper.util.Logger;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.HudElementRegistry;
+import net.minecraft.util.Identifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import com.mojang.blaze3d.platform.InputConstants;
 import org.lwjgl.glfw.GLFW;
 
@@ -281,25 +283,25 @@ public class BazaarFlipperMod implements ClientModInitializer {
         }
 
         // Register keybindings in Minecraft controls screen under "Bazaar Flipper"
-        openDashboardKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+        openDashboardKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.open_dashboard",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_RIGHT_CONTROL,
                 "category.bazaarflipper"
         ));
-        toggleFlipperKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+        toggleFlipperKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.toggle_flipper",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
                 "category.bazaarflipper"
         ));
-        toggleHudKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+        toggleHudKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.toggle_hud",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
                 "category.bazaarflipper"
         ));
-        emergencyStopKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+        emergencyStopKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.bazaarflipper.emergency_stop",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
@@ -308,7 +310,7 @@ public class BazaarFlipperMod implements ClientModInitializer {
 
         // Register events
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
-        HudRenderCallback.EVENT.register(this::onHudRender);
+        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("bazaarflipper", "hud"), this::onHudRender);
         ClientReceiveMessageEvents.GAME.register(this::onGameMessage);
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> onDisconnect());
         // Ensure all config saved even when restart game - save on client stopping
@@ -432,7 +434,7 @@ public class BazaarFlipperMod implements ClientModInitializer {
         }
     }
 
-    private void onHudRender(GuiGraphics context, net.minecraft.client.DeltaTracker tickCounter) {
+    private void onHudRender(GuiGraphicsExtractor context, net.minecraft.client.DeltaTracker tickCounter) {
         // Render HUD overlay and toast notifications
         hudOverlay.render(context, tickCounter.getGameTimeDeltaPartialTick(true));
 

@@ -82,7 +82,7 @@ public class BazaarInteractor {
             // Simulate right-click handled by interactionManager
             // Simplified: use mc.gameMode.interactEntity
             try {
-                mc.gameMode.interact(mc.player, bestEntity, net.minecraft.world.InteractionHand.MAIN_HAND);
+                mc.gameMode.interact(mc.player, bestEntity, new net.minecraft.world.phys.EntityHitResult(bestEntity), net.minecraft.world.InteractionHand.MAIN_HAND);
                 return waitForGui("Bazaar");
             } catch (Exception e) {
                 Logger.error("NPC interact failed", e);
@@ -152,7 +152,7 @@ public class BazaarInteractor {
                         if (slot.getItem().isEmpty()) continue;
                         String name = slot.getItem().getHoverName().getString().toLowerCase();
                         if (name.contains("custom") && name.contains("amount")) {
-                            clickSimulator.clickSlot(quantityScreen.getMenu().containerId, slot.index, 0, net.minecraft.world.inventory.ClickType.PICKUP);
+                            clickSimulator.clickSlot(quantityScreen.getMenu().containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
                             customAmountClicked = true;
                             break;
                         }
@@ -182,7 +182,7 @@ public class BazaarInteractor {
                         if (slot.getItem().isEmpty()) continue;
                         String name = slot.getItem().getHoverName().getString().toLowerCase();
                         if (name.contains("custom") && name.contains("price")) {
-                            clickSimulator.clickSlot(priceScreen.getMenu().containerId, slot.index, 0, net.minecraft.world.inventory.ClickType.PICKUP);
+                            clickSimulator.clickSlot(priceScreen.getMenu().containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
                             customPriceClicked = true;
                             break;
                         }
@@ -269,7 +269,7 @@ public class BazaarInteractor {
                         if (slot.getItem().isEmpty()) continue;
                         String name = slot.getItem().getHoverName().getString().toLowerCase();
                         if (name.contains("custom") && name.contains("amount")) {
-                            clickSimulator.clickSlot(qtyScreen.getMenu().containerId, slot.index, 0, net.minecraft.world.inventory.ClickType.PICKUP);
+                            clickSimulator.clickSlot(qtyScreen.getMenu().containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
                             customClicked = true;
                             break;
                         }
@@ -292,7 +292,7 @@ public class BazaarInteractor {
                         if (slot.getItem().isEmpty()) continue;
                         String name = slot.getItem().getHoverName().getString().toLowerCase();
                         if (name.contains("custom") && name.contains("price")) {
-                            clickSimulator.clickSlot(priceScreen.getMenu().containerId, slot.index, 0, net.minecraft.world.inventory.ClickType.PICKUP);
+                            clickSimulator.clickSlot(priceScreen.getMenu().containerId, slot.index, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
                             customClicked = true;
                             break;
                         }

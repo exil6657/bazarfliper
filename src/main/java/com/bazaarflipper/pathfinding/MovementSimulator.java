@@ -20,7 +20,7 @@ import java.util.Random;
  * - Velocity smoothing, not zero instant stop
  * - Random micro-adjustments even when idle (human never perfectly still)
  * - Head bob independent
- * - Uses Minecraft.options key bindings .setPressed() per spec
+ * - Uses Minecraft.options key bindings .setDown() per spec
  * Credits: Cldz
  */
 public class MovementSimulator {
@@ -45,7 +45,7 @@ public class MovementSimulator {
             new Thread(() -> {
                 try { Thread.sleep(delay); } catch (InterruptedException ignored) {}
                 try {
-                    keyBinding.setPressed(pressed);
+                    keyBinding.setDown(pressed);
                 } catch (Exception e) {
                     Logger.debug("Key press failed: " + e.getMessage());
                 }
@@ -62,13 +62,13 @@ public class MovementSimulator {
         if (pressed) {
             if (now - lastForwardToggle > MathUtils.randomInt(800, 2000)) {
                 if (random.nextDouble() < 0.05) { // 5% chance irregular release
-                    mc.options.keyUp.setPressed(false);
+                    mc.options.keyUp.setDown(false);
                     currentForwardPressure = 0;
                     lastForwardToggle = now;
                     // Re-press after brief
                     new Thread(() -> {
                         try { Thread.sleep(MathUtils.randomInt(20, 60)); } catch (InterruptedException ignored) {}
-                        if (mc.options != null) mc.options.keyUp.setPressed(true);
+                        if (mc.options != null) mc.options.keyUp.setDown(true);
                     }).start();
                     return;
                 }
@@ -88,7 +88,7 @@ public class MovementSimulator {
 
         // In Minecraft digital input we can't truly analog, but we can simulate via occasional release
         // For simplicity we still set pressed true if finalPressure >0.15
-        mc.options.keyUp.setPressed(pressed && finalPressure > 0.15);
+        mc.options.keyUp.setDown(pressed && finalPressure > 0.15);
         if (pressed) lastForwardToggle = now;
     }
 
@@ -98,7 +98,7 @@ public class MovementSimulator {
             // Backwards slower, add extra delay
             long delay = pressed ? MathUtils.randomInt(30, 90) : MathUtils.randomInt(20, 60);
             try { Thread.sleep(delay / 10); } catch (InterruptedException ignored) {} // tiny, not blocking too much
-            mc.options.keyDown.setPressed(pressed);
+            mc.options.keyDown.setDown(pressed);
         }
     }
 
@@ -110,7 +110,7 @@ public class MovementSimulator {
                 float yawNudge = random.nextBoolean() ? -2f : 2f;
                 setYaw(mc.player != null ? mc.player.getYRot() + yawNudge : 0, 8f);
             }
-            mc.options.keyLeft.setPressed(pressed);
+            mc.options.keyLeft.setDown(pressed);
         }
     }
 
@@ -121,7 +121,7 @@ public class MovementSimulator {
                 float yawNudge = random.nextBoolean() ? -2f : 2f;
                 setYaw(mc.player != null ? mc.player.getYRot() + yawNudge : 0, 8f);
             }
-            mc.options.keyRight.setPressed(pressed);
+            mc.options.keyRight.setDown(pressed);
         }
     }
 
@@ -160,7 +160,7 @@ public class MovementSimulator {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         float current = mc.player.getXRot();
-        targetPitch = MathUtils.clamp(targetPitch, -85f, 85f);
+        targetPitch = (float) MathUtils.clamp(targetPitch, -85f, 85f);
         float diff = targetPitch - current;
         double noise = (random.nextDouble() - 0.5) * 0.5;
         float step = (float) (Math.signum(diff) * Math.min(Math.abs(diff), speed + noise));
@@ -272,14 +272,14 @@ public class MovementSimulator {
         if (mc.options == null) return;
 
         // Deceleration curve, not instant stop for realism: release keys with slight stagger
-        mc.options.keyUp.setPressed(false);
+        mc.options.keyUp.setDown(false);
         try { Thread.sleep(MathUtils.randomInt(10,30)); } catch (InterruptedException ignored) {}
-        mc.options.keyLeft.setPressed(false);
-        mc.options.keyRight.setPressed(false);
+        mc.options.keyLeft.setDown(false);
+        mc.options.keyRight.setDown(false);
         try { Thread.sleep(MathUtils.randomInt(10,30)); } catch (InterruptedException ignored) {}
-        mc.options.keyDown.setPressed(false);
-        mc.options.keyJump.setPressed(false);
-        mc.options.keySprint.setPressed(false);
+        mc.options.keyDown.setDown(false);
+        mc.options.keyJump.setDown(false);
+        mc.options.keySprint.setDown(false);
 
         currentForwardPressure = 0;
 

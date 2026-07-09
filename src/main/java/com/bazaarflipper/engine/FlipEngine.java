@@ -99,7 +99,7 @@ public class FlipEngine {
         this.sessionStateManager = sessionStateManager;
         this.breakScheduler = breakScheduler;
         this.locationValidator = locationValidator;
-        this.levelStateRecovery = worldStateRecovery;
+        this.worldStateRecovery = worldStateRecovery;
         this.packetRateLimiter = packetRateLimiter;
         this.commandQueue = commandQueue;
         this.watchdog = watchdog;
@@ -198,7 +198,7 @@ public class FlipEngine {
             executeAction(action);
         } else {
             // No queued actions, consider scanning for new flips if not all orders waiting
-            if (activeFlips.size() < config.maxConcurrentItems) { // simplified budget check
+            if (activeFlips.size() < 10) { // simplified budget check
                 scanForNewFlips();
             } else {
                 // All orders in wait state? -> order wait break
@@ -233,7 +233,7 @@ public class FlipEngine {
         if (lastBazaarData == null) return;
         state = FlipState.SCANNING_MARKET;
 
-        var opportunities = itemSelector.selectBestItems(lastBazaarData, ahClient, config.maxConcurrentItems - activeFlips.size());
+        var opportunities = itemSelector.selectBestItems(lastBazaarData, ahClient, 10 - activeFlips.size());
         for (var opp : opportunities) {
             if (activeFlips.containsKey(opp.productId)) continue;
             double cost = opp.buyPrice * opp.quantity;

@@ -40,13 +40,13 @@ public class EnvironmentalScanner {
             if (name.contains("bazaar") || name.contains("auction") || name.contains("bank")) {
                 score = 20 - dist;
                 type = "npc";
-            } else if (e.isPlayer()) {
+            } else if (e instanceof net.minecraft.world.entity.player.Player) {
                 score = 10 - dist*0.5;
                 type = "player";
             } else if (e.getType().toString().contains("armor_stand")) {
                 score = 3;
                 type = "decoration";
-            } else if (e.isLiving()) {
+            } else if (e instanceof net.minecraft.world.entity.LivingEntity) {
                 score = 2;
                 type = "mob";
             }
@@ -67,7 +67,7 @@ public class EnvironmentalScanner {
         for (int dx=-(int)radius; dx<=radius; dx++) {
             for (int dy=-(int)radius; dy<=radius; dy++) {
                 for (int dz=-(int)radius; dz<=radius; dz++) {
-                    BlockPos check = pos.add(dx,dy,dz);
+                    BlockPos check = pos.offset(dx,dy,dz);
                     try {
                         var state = mc.level.getBlockState(check);
                         String blockId = state.getBlock().toString().toLowerCase();
@@ -88,7 +88,7 @@ public class EnvironmentalScanner {
             BlockPos below = pos.below(i);
             try {
                 var state = mc.level.getBlockState(below);
-                if (!state.isAir() && state.isSolidRender(mc.level, below)) return false;
+                if (!state.isAir() && state.isSolidRender()) return false;
             } catch (Exception e) { return true; }
         }
         return true; // no ground found within depth -> void

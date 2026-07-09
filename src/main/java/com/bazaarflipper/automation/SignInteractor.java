@@ -221,7 +221,7 @@ public class SignInteractor {
     public boolean clickSignAndInput(ClickSimulator clickSimulator, int screenHandlerSyncId, int signSlotId, String text) {
         try {
             // Click sign slot
-            clickSimulator.clickSlot(screenHandlerSyncId, signSlotId, 0, net.minecraft.world.inventory.ClickType.PICKUP);
+            clickSimulator.clickSlot(screenHandlerSyncId, signSlotId, 0, net.minecraft.screen.slot.SlotActionType.PICKUP);
 
             // Wait for sign GUI
             if (!waitForSignGui(3000)) {

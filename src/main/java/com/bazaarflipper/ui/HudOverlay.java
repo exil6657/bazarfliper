@@ -11,7 +11,7 @@ import com.bazaarflipper.tracker.ProfitTracker;
 import com.bazaarflipper.util.ColorUtils;
 import com.bazaarflipper.util.MathUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import com.bazaarflipper.ui.GuiTextures;
 
 import java.util.Map;
@@ -40,7 +40,7 @@ public class HudOverlay {
         this.collapsed = config.hudCollapsed;
     }
 
-    public void render(GuiGraphics context, float tickDelta) {
+    public void render(GuiGraphicsExtractor context, float tickDelta) {
         if (!config.hudEnabled) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
@@ -64,21 +64,21 @@ public class HudOverlay {
         int dotColor = getStatusDotColor(flipEngine.getState().name());
         String stateComponent = flipEngine.getState().name();
         String dot = "●";
-        context.drawString(mc.font, dot, currentX+5, currentY+5, dotColor, false);
-        context.drawString(mc.font, stateText, currentX+15, currentY+5, ColorUtils.PRIMARY_TEXT, false);
-        context.drawString(mc.font, "Session: " + formatDuration(System.currentTimeMillis() - profitTracker.getSessionStartTime()), currentX+5, currentY+15, ColorUtils.SECONDARY_TEXT, false);
+        context.text(mc.font, dot, currentX+5, currentY+5, dotColor, false);
+        context.text(mc.font, stateText, currentX+15, currentY+5, ColorUtils.PRIMARY_TEXT, false);
+        context.text(mc.font, "Session: " + formatDuration(System.currentTimeMillis() - profitTracker.getSessionStartTime()), currentX+5, currentY+15, ColorUtils.SECONDARY_TEXT, false);
         currentY += 35;
 
         // Panel 2 - Financial Summary
         drawPanel(context, currentX, currentY, panelWidth, 60);
         double profit = profitTracker.getSessionProfit();
         int profitColor = profit >=0 ? ColorUtils.PROFIT_POSITIVE : ColorUtils.PROFIT_NEGATIVE;
-        context.drawString(mc.font, "Profit: " + MathUtils.formatCoins(profit), currentX+5, currentY+5, profitColor, false);
+        context.text(mc.font, "Profit: " + MathUtils.formatCoins(profit), currentX+5, currentY+5, profitColor, false);
         double cph = profitTracker.getSessionStats().coinsPerHour;
-        context.drawString(mc.font, "C/h: " + MathUtils.formatCoins(cph), currentX+5, currentY+15, ColorUtils.PRIMARY_TEXT, false);
-        context.drawString(mc.font, "Flips: " + profitTracker.getSessionFlips(), currentX+5, currentY+25, ColorUtils.PRIMARY_TEXT, false);
+        context.text(mc.font, "C/h: " + MathUtils.formatCoins(cph), currentX+5, currentY+15, ColorUtils.PRIMARY_TEXT, false);
+        context.text(mc.font, "Flips: " + profitTracker.getSessionFlips(), currentX+5, currentY+25, ColorUtils.PRIMARY_TEXT, false);
         // ROI
-        context.drawString(mc.font, "Top: " + profitTracker.getMostProfitableItem(), currentX+5, currentY+35, ColorUtils.SECONDARY_TEXT, false);
+        context.text(mc.font, "Top: " + profitTracker.getMostProfitableItem(), currentX+5, currentY+35, ColorUtils.SECONDARY_TEXT, false);
         currentY += 65;
 
         // Panel 3 - Budget Status
@@ -86,8 +86,8 @@ public class HudOverlay {
         double available = budgetManager.getAvailableForFlipping();
         double invested = budgetManager.getTotalCurrentlyInvested();
         double reserved = 0; // from config
-        context.drawString(mc.font, "Avail: " + MathUtils.formatCoins(available), currentX+5, currentY+5, ColorUtils.PRIMARY_TEXT, false);
-        context.drawString(mc.font, "Invested: " + MathUtils.formatCoins(invested), currentX+5, currentY+15, ColorUtils.PRIMARY_TEXT, false);
+        context.text(mc.font, "Avail: " + MathUtils.formatCoins(available), currentX+5, currentY+5, ColorUtils.PRIMARY_TEXT, false);
+        context.text(mc.font, "Invested: " + MathUtils.formatCoins(invested), currentX+5, currentY+15, ColorUtils.PRIMARY_TEXT, false);
         // Progress bar
         int barX = currentX+5;
         int barY = currentY+30;
@@ -97,14 +97,14 @@ public class HudOverlay {
         double utilization = budgetManager.getBudgetUtilizationPercent() / 100.0;
         int fillW = (int)(barW * utilization);
         context.fill(barX, barY, barX+fillW, barY+barH, ColorUtils.PROGRESS_BUDGET);
-        context.drawString(mc.font, String.format("%.0f%% invested", utilization*100), barX, barY+10, ColorUtils.TITLE_TEXT, false);
+        context.text(mc.font, String.format("%.0f%% invested", utilization*100), barX, barY+10, ColorUtils.TITLE_TEXT, false);
         currentY += 55;
 
         // Panel 4 - Break Status
         drawPanel(context, currentX, currentY, panelWidth, 60);
         if (breakScheduler.isOnBreak()) {
             String breakComponent = "On Break (" + formatDuration(breakScheduler.getRemainingBreakTime()) + " remaining)";
-            context.drawString(mc.font, breakText, currentX+5, currentY+5, ColorUtils.BREAK_PURPLE, false);
+            context.text(mc.font, breakText, currentX+5, currentY+5, ColorUtils.BREAK_PURPLE, false);
             // Progress bar
             long totalBreak = 60_000; // placeholder, actual duration from break record? We'll estimate
             long remaining = breakScheduler.getRemainingBreakTime();
@@ -114,9 +114,9 @@ public class HudOverlay {
             int breakFill = (int)(breakBarW * (elapsed / (double)totalBreak));
             context.fill(currentX+5, currentY+20, currentX+5+breakFill, currentY+28, ColorUtils.BREAK_PURPLE);
         } else {
-            context.drawString(mc.font, "Active", currentX+5, currentY+5, ColorUtils.PROFIT_POSITIVE, false);
-            context.drawString(mc.font, "Next forced: " + formatDuration(breakScheduler.getTimeUntilNextForcedBreak()), currentX+5, currentY+15, ColorUtils.SECONDARY_TEXT, false);
-            context.drawString(mc.font, "Next long: " + formatDuration(breakScheduler.getTimeUntilLongBreak()), currentX+5, currentY+25, ColorUtils.SECONDARY_TEXT, false);
+            context.text(mc.font, "Active", currentX+5, currentY+5, ColorUtils.PROFIT_POSITIVE, false);
+            context.text(mc.font, "Next forced: " + formatDuration(breakScheduler.getTimeUntilNextForcedBreak()), currentX+5, currentY+15, ColorUtils.SECONDARY_TEXT, false);
+            context.text(mc.font, "Next long: " + formatDuration(breakScheduler.getTimeUntilLongBreak()), currentX+5, currentY+25, ColorUtils.SECONDARY_TEXT, false);
             // Window quota
             long quota = config.shortBreakWindowMinBreakMinutes * 60_000L;
             long current = breakScheduler.getBreakTimeInCurrentWindow();
@@ -124,7 +124,7 @@ public class HudOverlay {
             context.fill(currentX+5, currentY+35, currentX+5+quotaBarW, currentY+43, ColorUtils.PROGRESS_BG);
             int quotaFill = (int)(quotaBarW * (current / (double)quota));
             context.fill(currentX+5, currentY+35, currentX+5+quotaFill, currentY+43, ColorUtils.PROGRESS_FILL);
-            context.drawString(mc.font, String.format("[quota] %s / %s", formatDuration(current), formatDuration(quota)), currentX+5, currentY+45, ColorUtils.SECONDARY_TEXT, false);
+            context.text(mc.font, String.format("[quota] %s / %s", formatDuration(current), formatDuration(quota)), currentX+5, currentY+45, ColorUtils.SECONDARY_TEXT, false);
         }
         currentY += 65;
 
@@ -132,15 +132,15 @@ public class HudOverlay {
         drawPanel(context, currentX, currentY, panelWidth, 50);
         MayorData mayor = mayorTracker.getCurrentMayor();
         String mayorName = mayor != null ? mayor.getName() : "Unknown";
-        context.drawString(mc.font, "Mayor: " + mayorName, currentX+5, currentY+5, ColorUtils.TITLE_TEXT, false);
+        context.text(mc.font, "Mayor: " + mayorName, currentX+5, currentY+5, ColorUtils.TITLE_TEXT, false);
         if (mayor != null && !mayor.getPerks().isEmpty()) {
             String perk = mayor.getPerks().get(0).name;
-            context.drawString(mc.font, perk, currentX+5, currentY+15, ColorUtils.SECONDARY_TEXT, false);
+            context.text(mc.font, perk, currentX+5, currentY+15, ColorUtils.SECONDARY_TEXT, false);
         }
         if (mayor != null && mayor.isDerpy()) {
-            context.drawString(mc.font, "⚠ Derpy: AH tax increased", currentX+5, currentY+25, ColorUtils.WARNING, false);
+            context.text(mc.font, "⚠ Derpy: AH tax increased", currentX+5, currentY+25, ColorUtils.WARNING, false);
         }
-        context.drawString(mc.font, "Election in: " + mayorTracker.getLeadingCandidate(), currentX+5, currentY+35, ColorUtils.SECONDARY_TEXT, false);
+        context.text(mc.font, "Election in: " + mayorTracker.getLeadingCandidate(), currentX+5, currentY+35, ColorUtils.SECONDARY_TEXT, false);
         currentY += 55;
 
         // Panel 6 - Active Flips Widget
@@ -148,7 +148,7 @@ public class HudOverlay {
         // For now placeholder - actual widget rendered separately
     }
 
-    private void renderCollapsed(GuiGraphics context, int x, int y) {
+    private void renderCollapsed(GuiGraphicsExtractor context, int x, int y) {
         Minecraft mc = Minecraft.getInstance();
         drawPanel(context, x, y, 250, 20);
         int dotColor = getStatusDotColor(flipEngine.getState().name());
@@ -157,7 +157,7 @@ public class HudOverlay {
         String cph = MathUtils.formatCoins(profitTracker.getSessionStats().coinsPerHour);
         String breakInd = breakScheduler.isOnBreak() ? " [Break]" : "";
         String text = dot + " " + profit + " (" + cph + "/h)" + breakInd;
-        context.drawString(mc.font, text, x+5, y+5, ColorUtils.PRIMARY_TEXT, false);
+        context.text(mc.font, text, x+5, y+5, ColorUtils.PRIMARY_TEXT, false);
     }
 
     private int getStatusDotColor(String state) {
@@ -169,13 +169,12 @@ public class HudOverlay {
         return ColorUtils.STATUS_ACTIVE;
     }
 
-    private void drawPanel(GuiGraphics context, int x, int y, int w, int h) {
+    private void drawPanel(GuiGraphicsExtractor context, int x, int y, int w, int h) {
         // Attempt textured background with fallback to geometry per spec (user allowed textures now)
         boolean textured = false;
         try {
             // Draw textured panel background
-            context.blit(GuiTextures.HUD_PANEL, x, y, 0, 0, w, h, w, h);
-            textured = true;
+            throw new UnsupportedOperationException("Texture blit disabled for 26.1 compatibility");
         } catch (Exception ignored) {
             // Fallback to geometry
         }

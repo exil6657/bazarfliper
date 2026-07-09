@@ -113,7 +113,7 @@ public class HumanizedNavigator {
         try { Thread.sleep(planningDelay); } catch (InterruptedException ignored) {}
 
         if (!currentPath.success && !currentPath.partial) {
-            Logger.warn("Failed to calculate path to " + waypointName + " (target " + targetBlockPos + ")", new Exception("Pathfinding failed"));
+            Logger.warn("Failed to calculate path to " + waypointName + " (target " + targetBlockPos + "): Pathfinding failed");
             state = NavigationState.FAILED;
             return;
         }
@@ -152,7 +152,7 @@ public class HumanizedNavigator {
                 // 30% chance arrival overshoot 0.5-1.5 blocks then walk back (human)
                 if (random.nextFloat() < 0.3) {
                     double overshootDist = MathUtils.randomDouble(0.5, 1.5);
-                    Vec3 overshootDir = playerPos.subtract(targetVec).normalize().multiply(overshootDist);
+                    Vec3 overshootDir = playerPos.subtract(targetVec).normalize().scale(overshootDist);
                     if (overshootDir.length() < 0.1) {
                         // Random direction if directly on target
                         double angle = random.nextDouble() * Math.PI * 2;
@@ -443,10 +443,10 @@ public class HumanizedNavigator {
                 if (dist > 8 || dist < 1) continue;
                 double score = 0;
                 // Score based on type: NPCs, chests, players more interesting
-                if (e.isPlayer()) score = 10 - dist;
+                if (e instanceof net.minecraft.world.entity.player.Player) score = 10 - dist;
                 else if (e.getName().getString().toLowerCase().contains("bazaar") || e.getName().getString().toLowerCase().contains("auction") || e.getName().getString().toLowerCase().contains("bank")) {
                     score = 20 - dist;
-                } else if (e.isLiving()) score = 5 - dist*0.5;
+                } else if (e instanceof net.minecraft.world.entity.LivingEntity) score = 5 - dist*0.5;
                 if (score > bestScore) {
                     bestScore = score;
                     best = e;
@@ -464,12 +464,12 @@ public class HumanizedNavigator {
             Vec3 avoidance = Vec3.ZERO;
             for (Entity e : mc.level.entitiesForRendering()) {
                 if (e == mc.player) continue;
-                if (!e.isPlayer() && !e.isLiving()) continue;
+                if (!(e instanceof net.minecraft.world.entity.player.Player) && !(e instanceof net.minecraft.world.entity.LivingEntity)) continue;
                 double dist = e.position().distanceTo(playerPos);
                 if (dist < 3.0) {
                     Vec3 away = playerPos.subtract(e.position()).normalize();
                     double strength = (3.0 - dist) / 3.0 * 0.5;
-                    avoidance = avoidance.add(away.multiply(strength));
+                    avoidance = avoidance.add(away.scale(strength));
                 }
             }
             return avoidance;

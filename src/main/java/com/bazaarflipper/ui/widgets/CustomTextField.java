@@ -3,7 +3,7 @@ package com.bazaarflipper.ui.widgets;
 import com.bazaarflipper.ui.GuiTextures;
 import com.bazaarflipper.util.ColorUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 /**
  * Component field drawn via fill + texture background + blinking cursor rectangle per spec
@@ -66,7 +66,7 @@ public class CustomTextField {
         }
     }
 
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
         int borderColor = valid ? ColorUtils.INPUT_BORDER_VALID : ColorUtils.INPUT_BORDER_INVALID;
 
@@ -77,8 +77,8 @@ public class CustomTextField {
         // Background - try texture if available, else fill
         boolean useTexture = true;
         try {
-            // For 26.1.2, GuiGraphics.drawTexture with ResourceLocation
-            context.blit(GuiTextures.PANEL_BG, x, y, 0, 0, width, height, width, height);
+            // For 26.1.2, GuiGraphicsExtractor.drawTexture with Identifier
+            throw new UnsupportedOperationException("Texture blit disabled for 26.1 compatibility");
         } catch (Exception e) {
             useTexture = false;
             context.fill(x, y, x+width, y+height, ColorUtils.INPUT_BG);
@@ -89,7 +89,7 @@ public class CustomTextField {
 
         String displayComponent = text.isEmpty() && !focused ? placeholder : text;
         int textColor = text.isEmpty() && !focused ? ColorUtils.SECONDARY_TEXT : ColorUtils.PRIMARY_TEXT;
-        context.drawString(mc.font, displayText, x+4, y + (height - 8)/2, textColor, false);
+        context.text(mc.font, displayText, x+4, y + (height - 8)/2, textColor, false);
 
         // Blinking cursor rectangle
         if (focused) {

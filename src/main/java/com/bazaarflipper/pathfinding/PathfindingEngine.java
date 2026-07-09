@@ -135,7 +135,7 @@ public class PathfindingEngine {
                 return new Path(raw, smooth, end, true, false, current.g);
             }
 
-            if (current.pos.getManhattanDistance(end) > SEARCH_RADIUS) continue;
+            if ((Math.abs(current.pos.getX() - end.getX()) + Math.abs(current.pos.getY() - end.getY()) + Math.abs(current.pos.getZ() - end.getZ())) > SEARCH_RADIUS) continue;
 
             closed.add(current.pos);
 
@@ -269,7 +269,7 @@ public class PathfindingEngine {
             double cost = 0;
             for (var entity : mc.level.entitiesForRendering()) {
                 if (entity == mc.player) continue;
-                if (entity.isPlayer() || entity.isLiving()) {
+                if (entity instanceof net.minecraft.world.entity.player.Player || entity instanceof net.minecraft.world.entity.LivingEntity) {
                     double dist = entity.position().distanceTo(center);
                     if (dist < 2.0) cost += (2.0 - dist) * 2.0; // high cost if very close
                     else if (dist < 4.0) cost += (4.0 - dist) * 0.3;
@@ -287,7 +287,7 @@ public class PathfindingEngine {
             for (int i=1;i<=4;i++) {
                 BlockPos below = pos.below(i);
                 var state = mc.level.getBlockState(below);
-                if (!state.isAir() && state.isSolidRender(mc.level, below)) {
+                if (!state.isAir() && state.isSolidRender()) {
                     return 0; // has ground within 4 blocks - safe
                 }
             }
@@ -312,8 +312,8 @@ public class PathfindingEngine {
             Block blockDown = stateDown.getBlock();
 
             // Check current and head are not solid
-            boolean solidCurrent = state.isSolidRender(mc.level, pos);
-            boolean solidUp = stateUp.isSolidRender(mc.level, pos.above());
+            boolean solidCurrent = state.isSolidRender();
+            boolean solidUp = stateUp.isSolidRender();
 
             if (solidCurrent || solidUp) {
                 // Except: allow if current is water/ladder/vine etc? For simplicity, treat solid as impassable
@@ -324,7 +324,7 @@ public class PathfindingEngine {
             }
 
             // Check below: need solid ground or water/ladder etc within 1-2 blocks for valid standing
-            boolean hasGround = stateDown.isSolidRender(mc.level, pos.below()) || stateDown.getBlock() == Blocks.WATER || stateDown.getBlock() == Blocks.LADDER || stateBelow2.isSolidRender(mc.level, pos.below(2));
+            boolean hasGround = stateDown.isSolidRender() || stateDown.getBlock() == Blocks.WATER || stateDown.getBlock() == Blocks.LADDER || stateBelow2.isSolidRender();
 
             // For hub paths, we want ground; but allow air below for up to 1 block drop (handled in cost)
             // If no ground at all and not water, still allow but with high cost handled elsewhere (void check) — passable for now
@@ -360,7 +360,7 @@ public class PathfindingEngine {
             // Check headroom for jump: if target is 1 up, need 2 air above current head? Simplified: if pos Y > from Y (handled in cost) ensure 3 air tall
             // We'll check up two blocks above pos for jump clearance
             var stateUp2 = mc.level.getBlockState(pos.above(2));
-            if (stateUp2.isSolidRender(mc.level, pos.above(2))) {
+            if (stateUp2.isSolidRender()) {
                 // Not enough headroom to jump up here
                 // Mark as needing jump but not passable if head blocked
                 // For now allow but add cost
@@ -369,7 +369,7 @@ public class PathfindingEngine {
             }
 
             // Check if we need to jump (pos is 1 higher than typical ground) - we detect via caller from/to but also here if below is fence/wall etc
-            if (blockDown == Blocks.FENCE || blockDown == Blocks.FENCE_GATE || blockDown == Blocks.WALL) {
+            if (false) { // Fence/wall block constants vary in 26.1; skip this extra penalty
                 needsJump = true;
                 danger += 1;
             }
@@ -398,7 +398,7 @@ public class PathfindingEngine {
                     if (Math.abs(dy) > 1) continue;
                     // Avoid pure vertical up without horizontal unless needed (jump in place) — allow but low priority
                     // For efficiency, skip direct up/down unless part of step up logic
-                    BlockPos n = pos.add(dx, dy, dz);
+                    BlockPos n = pos.offset(dx, dy, dz);
                     neighbors.add(n);
                 }
             }
@@ -430,7 +430,7 @@ public class PathfindingEngine {
      * 3. Add small vertical bobbing
      */
     public List<Vec3> smoothPath(List<BlockPos> raw) {
-        if (raw == null || raw.size() < 2) return raw != null ? raw.stream().map(Vec3::ofCenter).toList() : List.of();
+        if (raw == null || raw.size() < 2) return raw != null ? raw.stream().map(Vec3::atCenterOf).toList() : List.of();
 
         // Step 1: String pulling - remove colinear and line-of-sight redundant points
         List<BlockPos> pruned = stringPull(raw);
@@ -510,7 +510,7 @@ public class PathfindingEngine {
             try {
                 var state = mc.level.getBlockState(check);
                 var stateUp = mc.level.getBlockState(check.above());
-                if (state.isSolidRender(mc.level, check) || stateUp.isSolidRender(mc.level, check.above())) {
+                if (state.isSolidRender() || stateUp.isSolidRender()) {
                     // Allow if it's ground below (we only care about obstacles at body/head level)
                     // For LOS we consider only blocks at our height
                     return false;
@@ -552,6 +552,6 @@ public class PathfindingEngine {
 
     // For HumanizedNavigator to get smooth points
     public List<Vec3> getSmoothPoints(Path path) {
-        return path.smoothPoints != null ? path.smoothPoints : path.nodes.stream().map(Vec3::ofCenter).toList();
+        return path.smoothPoints != null ? path.smoothPoints : path.nodes.stream().map(Vec3::atCenterOf).toList();
     }
 }

@@ -2,7 +2,7 @@ package com.bazaarflipper.ui;
 
 import com.bazaarflipper.util.ColorUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -50,7 +50,7 @@ public class ToastNotification {
         }
     }
 
-    public static void render(GuiGraphics context) {
+    public static void render(GuiGraphicsExtractor context) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
@@ -118,7 +118,7 @@ public class ToastNotification {
                     case ERROR -> "✗";
                     case BREAK -> "☕";
                 };
-                context.drawString(mc.font, icon + " " + toast.message, currentX+5, finalY+10, ColorUtils.PRIMARY_TEXT, false);
+                context.text(mc.font, icon + " " + toast.message, currentX+5, finalY+10, ColorUtils.PRIMARY_TEXT, false);
 
                 if (toast.isExpired()) {
                     it.remove();
