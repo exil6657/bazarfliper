@@ -15,7 +15,6 @@
   "entrypoints": {
     "client": ["com.bazaarflipper.BazaarFlipperMod"]
   },
-  "mixins": ["bazaarflipper.mixins.json"],
   "depends": {
     "fabricloader": ">=0.19.3",
     "minecraft": "26.1.2",
