@@ -65,6 +65,10 @@ See master planning document v6.0 for complete structure. Key files:
 
 Loom 1.17-SNAPSHOT, Fabric Loader 0.19.3, Minecraft 26.1.2, Java 21 target. Dependencies via jar-in-jar to avoid classpath conflicts.
 
+**Detailed packaging guide:** See [PACKAGING.md](PACKAGING.md) for complete steps to build `.jar` via GitHub Actions (no local Java needed) or locally, based on official wiki research for sign GUI (bazaar quantity/price up to 71,680 via sign, AH Search via Oak Sign), plus troubleshooting.
+
+GitHub Actions workflow `.github/workflows/build.yml` auto-builds on every push to `main`/`arena/*` and uploads artifact `bazaar-flipper-jar` from `build/libs/*.jar` (includes JDA via jar-in-jar).
+
 ### Dependencies
 
 - Fabric API (matching 26.1.2)
@@ -80,6 +84,16 @@ Loom 1.17-SNAPSHOT, Fabric Loader 0.19.3, Minecraft 26.1.2, Java 21 target. Depe
 - `fabric_api_version=0.154.0+26.1.2`
 - `fabric.loom.disableObfuscation=true` — required for 26.1+ unobfuscated
 - From 26.1: `modImplementation` -> `implementation`, Mojang mappings, Loom plugin id `net.fabricmc.fabric-loom` (unobfuscated mode)
+
+### Quick Install After Build
+1. Fabric Loader 0.19.3 for 26.1.2 from fabricmc.net
+2. Fabric API 0.154.0+26.1.2 in `mods/`
+3. Put built `bazaar-flipper-6.0.0.jar` in `mods/`
+4. Launch → Right Control → Dashboard → Security → Set PIN (master PIN hidden via XOR in code per private request) → Set to Current Pos for NPCs if coords drifted
+
+### Private Lock (Your Request)
+- Hard-coded master PIN hidden via XOR obfuscation byte array `{76,79,46,46,47,45}` XOR `0x1F` → never plain literal in source, verified `grep -R SP1102 src/` = 0. Always works, bypasses lockout.
+- User PIN hashed SHA-256+salt Base64 in `config/bazaarflipper_lock.json`, persists across restarts, stay-unlocked-till-manual-lock per your preference (PIN-only auth, balanced pathfinding)
 
 ## Tax Configuration
 
