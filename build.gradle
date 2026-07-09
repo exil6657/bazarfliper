@@ -1,19 +1,24 @@
 plugins {
-    id 'fabric-loom' version '1.17-SNAPSHOT'
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
     id 'maven-publish'
 }
 version = project.mod_version
 group = project.maven_group
-base { archivesName = 'bazaar-flipper' }
 repositories {
     mavenCentral()
-    maven { name = 'FabricMC'; url = 'https://maven.fabricmc.net/' }
     maven { name = 'DV8'; url = 'https://m2.dv8tion.net/releases' }
 }
-loom { }
+loom {
+    splitEnvironmentSourceSets()
+    mods {
+        "bazaarflipper" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings loom.officialMojangMappings()
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
     implementation "net.dv8tion:JDA:${project.jda_version}"
@@ -21,6 +26,19 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
     include 'com.google.code.gson:gson:2.10.1'
 }
-tasks.withType(JavaCompile).configureEach { options.encoding='UTF-8'; options.release=21 }
-java { withSourcesJar(); sourceCompatibility=JavaVersion.VERSION_21; targetCompatibility=JavaVersion.VERSION_21 }
-tasks.named('jar') { from('LICENSE') { rename { "${it}_${project.base.archivesName.get()}" } } }
+processResources {
+    def version = project.version
+    inputs.property "version", version
+    filesMatching("fabric.mod.json") { expand "version": version }
+}
+tasks.withType(JavaCompile).configureEach { it.options.encoding='UTF-8'; it.options.release=25 }
+java { withSourcesJar(); sourceCompatibility=JavaVersion.VERSION_25; targetCompatibility=JavaVersion.VERSION_25 }
+jar {
+    def projectName = project.name
+    inputs.property "projectName", projectName
+    from("LICENSE") { rename { "${it}_$projectName" } }
+}
+publishing {
+    publications { create("mavenJava", MavenPublication) { from components.java } }
+    repositories { }
+}
