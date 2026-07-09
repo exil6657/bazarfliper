@@ -1014,9 +1014,10 @@ public class DashboardScreen extends Screen {
             currentButtons.add(copyCoords);
             curY+=btnH+3;
 
+            final int panelIndex = i;
             Button resetWiki = new Button(panelX+5, curY, btnW, btnH, "Reset to Wiki Default", () -> {
                 // Reset to wiki defaults based on slot
-                switch (i) {
+                switch (panelIndex) {
                     case 1 -> {
                         wd.x = -8.5; wd.y = 71; wd.z = -61.5;
                         wd.source = "Reset to wiki default Builder's House -8.5,71,-61.5";
