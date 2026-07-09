@@ -12,6 +12,7 @@ import com.bazaarflipper.util.ColorUtils;
 import com.bazaarflipper.util.MathUtils;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import com.bazaarflipper.ui.GuiTextures;
 
 import java.util.Map;
 
@@ -169,12 +170,31 @@ public class HudOverlay {
     }
 
     private void drawPanel(DrawContext context, int x, int y, int w, int h) {
-        // Border
-        context.fill(x-1, y-1, x+w+1, y+h+1, ColorUtils.PANEL_BORDER);
-        // Background
-        context.fill(x, y, x+w, y+h, ColorUtils.PANEL_BG);
-        // Inner highlight top
-        context.fill(x, y, x+w, y+1, ColorUtils.PANEL_INNER);
+        // Attempt textured background with fallback to geometry per spec (user allowed textures now)
+        boolean textured = false;
+        try {
+            // Draw textured panel background
+            context.drawTexture(GuiTextures.HUD_PANEL, x, y, 0, 0, w, h, w, h);
+            textured = true;
+        } catch (Exception ignored) {
+            // Fallback to geometry
+        }
+        if (!textured) {
+            // Border
+            context.fill(x-1, y-1, x+w+1, y+h+1, ColorUtils.PANEL_BORDER);
+            // Background
+            context.fill(x, y, x+w, y+h, ColorUtils.PANEL_BG);
+            // Inner highlight top
+            context.fill(x, y, x+w, y+1, ColorUtils.PANEL_INNER);
+        } else {
+            // Still draw border for crispness
+            context.fill(x-1, y-1, x+w+1, y, ColorUtils.PANEL_BORDER);
+            context.fill(x-1, y+h, x+w+1, y+h+1, ColorUtils.PANEL_BORDER);
+            context.fill(x-1, y, x, y+h, ColorUtils.PANEL_BORDER);
+            context.fill(x+w, y, x+w+1, y+h, ColorUtils.PANEL_BORDER);
+            // Inner highlight
+            context.fill(x, y, x+w, y+1, ColorUtils.PANEL_INNER);
+        }
     }
 
     private String formatDuration(long ms) {

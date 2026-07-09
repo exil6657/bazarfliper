@@ -77,8 +77,17 @@ public class DashboardScreen extends Screen {
 
         void render(DrawContext ctx, MinecraftClient mc, double mx, double my) {
             hovered = isMouseOver(mx, my);
-            int bg = hovered ? hoverColor : normalColor;
-            ctx.fill(x, y, x+w, y+h, bg);
+            // Attempt textured button with fallback to geometry per spec + user allowed textures
+            boolean textured = false;
+            try {
+                ctx.drawTexture(hovered ? GuiTextures.BUTTON_HOVER : GuiTextures.BUTTON, x, y, 0, 0, w, h, w, h);
+                textured = true;
+            } catch (Exception ignored) {}
+            if (!textured) {
+                int bg = hovered ? hoverColor : normalColor;
+                ctx.fill(x, y, x+w, y+h, bg);
+            }
+            // Border always via fill for crispness
             ctx.fill(x-1, y-1, x+w+1, y, ColorUtils.BUTTON_BORDER);
             ctx.fill(x-1, y+h, x+w+1, y+h+1, ColorUtils.BUTTON_BORDER);
             ctx.fill(x-1, y, x, y+h, ColorUtils.BUTTON_BORDER);
@@ -148,23 +157,28 @@ public class DashboardScreen extends Screen {
             }
         }));
 
-        // Tab bar - row of filled rectangles
+        // Tab bar - row of filled rectangles + optional textured tabs (user allowed textures)
         int tabBarY = 35;
         int tabX = 10;
         int tabHeight = 20;
         for (Tab tab : Tab.values()) {
             int tabWidth = textRenderer.getWidth(tab.display) + 20;
             boolean isActive = tab == activeTab;
-            int bg = isActive ? ColorUtils.TAB_ACTIVE_BG : ColorUtils.TAB_INACTIVE_BG;
-            context.fill(tabX, tabBarY, tabX+tabWidth, tabBarY+tabHeight, bg);
+            boolean textured = false;
+            try {
+                context.drawTexture(isActive ? GuiTextures.TAB_ACTIVE : GuiTextures.TAB_INACTIVE, tabX, tabBarY, 0, 0, tabWidth, tabHeight, tabWidth, tabHeight);
+                textured = true;
+            } catch (Exception ignored) {}
+            if (!textured) {
+                int bg = isActive ? ColorUtils.TAB_ACTIVE_BG : ColorUtils.TAB_INACTIVE_BG;
+                context.fill(tabX, tabBarY, tabX+tabWidth, tabBarY+tabHeight, bg);
+            }
             if (isActive) {
-                // bottom border accent 2px gold
+                // bottom border accent 2px gold (always via geometry for accent visibility)
                 context.fill(tabX, tabBarY+tabHeight-2, tabX+tabWidth, tabBarY+tabHeight, ColorUtils.TAB_ACTIVE_BORDER);
             }
             int textColor = isActive ? ColorUtils.PRIMARY_TEXT : ColorUtils.SECONDARY_TEXT;
             context.drawText(textRenderer, tab.display, tabX+10, tabBarY+6, textColor, false);
-            // Click area
-            int finalTabX = tabX;
             Tab finalTab = tab;
             currentButtons.add(new Button(tabX, tabBarY, tabWidth, tabHeight, tab.display, () -> activeTab = finalTab));
             tabX += tabWidth + 2;

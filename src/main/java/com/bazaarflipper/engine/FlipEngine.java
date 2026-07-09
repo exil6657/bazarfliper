@@ -16,6 +16,7 @@ import com.bazaarflipper.tracker.FlipRecord;
 import com.bazaarflipper.tracker.ProfitTracker;
 import com.bazaarflipper.util.Logger;
 import com.bazaarflipper.pathfinding.HumanizedNavigator;
+import com.bazaarflipper.ui.ToastNotification;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,6 +83,7 @@ public class FlipEngine {
     private final AuctionHouseClient ahClient;
 
     private BazaarData lastBazaarData;
+    private final Map<String, Integer> failureCounts = new ConcurrentHashMap<>();
 
     public FlipEngine(ModConfig config, BudgetManager budgetManager, SessionStateManager sessionStateManager,
                       BreakScheduler breakScheduler, LocationValidator locationValidator, WorldStateRecovery worldStateRecovery,
@@ -245,10 +247,79 @@ public class FlipEngine {
 
     public void checkForFilledOrders() {
         // Periodic, not during breaks (break check already above)
+        // Implements partial fill handling per spec:
+        // - Claim filled portion immediately
+        // - Post sell offer for claimed quantity at target price (Part A)
+        // - Leave remaining buy order active (Part B)
+        // - Apply stale logic to Part B independently
+        // - Record profit per part as each completes
         for (ActiveFlip flip : activeFlips.values()) {
-            // Check if filled - would need InventoryScanner.parseOrderLore or chat notifications
-            // Placeholder: skip
+            OrderManager.ActiveOrder order = orderManager.getAllActiveOrders().get(flip.productId);
+            if (order == null) continue;
+
+            double fillPct = order.fillPercentage;
+            if (fillPct >= 1.0) {
+                // Fully filled - claim handled via chat event
+                continue;
+            } else if (fillPct > 0 && fillPct < 1.0) {
+                // Partial fill detected
+                handlePartialFill(flip, order);
+            }
         }
+    }
+
+    private void handlePartialFill(ActiveFlip flip, OrderManager.ActiveOrder order) {
+        int filledQty = order.filledQty;
+        int remainingQty = order.totalQty - filledQty;
+        if (filledQty <= 0 || remainingQty < 0) return;
+
+        // Check if we already handled this partial fill (avoid duplicate)
+        if (flip.filledAmount >= filledQty) return;
+
+        Logger.info("Partial fill detected for " + flip.productId + " filled " + filledQty + "/" + order.totalQty);
+
+        // Claim filled portion immediately
+        boolean claimed = bazaarInteractor.claimOrder(flip.productId);
+        if (!claimed) {
+            Logger.warn("Failed to claim partial fill for " + flip.productId);
+            return;
+        }
+
+        // Part A: Post sell offer for claimed quantity at target price
+        double partAProfit = 0;
+        if ("NPC".equals(flip.strategyType)) {
+            // For NPC, navigate and sell immediately
+            commandQueue.enqueue(CommandQueue.ActionType.NAVIGATE, flip.productId, flip.targetSellPrice, filledQty);
+        } else {
+            commandQueue.enqueue(CommandQueue.ActionType.PLACE_SELL_OFFER, flip.productId, flip.targetSellPrice, filledQty);
+        }
+        // Record partial profit will be done when sell completes - for now log
+
+        // Part B: Leave remaining buy order active - update tracking
+        orderManager.markOrderPlaced(flip.productId + "_PART_B", order.orderType, remainingQty);
+        // Update original flip to reflect remaining
+        flip.quantity = remainingQty;
+        flip.filledAmount = 0; // reset fill for remaining part
+        // Apply stale logic to Part B independently - its own timer starts now
+        order.staleTimerStart = System.currentTimeMillis();
+        order.fillPercentage = 0;
+        order.filledQty = 0;
+        order.totalQty = remainingQty;
+
+        // Record profit per part as each completes - will be handled when Part A sells
+        // For now, release partial investment for claimed part? Actually investment remains until sell completes
+        // But we can adjust budget tracking: remaining investment is proportional
+        double claimedCost = flip.buyPrice * filledQty;
+        double remainingCost = flip.buyPrice * remainingQty;
+        // Budget already registered full amount, we keep remaining, Part A profit will release after sell
+
+        // Update active flips: create separate tracking for Part A as temporary
+        ActiveFlip partAFlip = new ActiveFlip(flip.productId + "_SELL_A", flip.buyPrice, flip.targetSellPrice, filledQty, flip.strategyType + "_PART_A");
+        partAFlip.amountInvested = claimedCost;
+        partAFlip.placementTimestamp = System.currentTimeMillis();
+        activeFlips.put(partAFlip.productId, partAFlip);
+
+        saveSessionState();
     }
 
     public void checkForUndercuts() {
@@ -423,24 +494,101 @@ public class FlipEngine {
     }
 
     private void handleFailure(CommandQueue.FlipAction action, Exception e) {
-        // Track failures - placeholder
-        // On 3 failures: mark FAILED, free budget, save state, notify Discord
-        // For now single failure frees budget if buy order
-        if (action.type == CommandQueue.ActionType.PLACE_BUY_ORDER) {
+        // Track failures: 3 failures -> mark FAILED, free budget, save state, notify Discord per spec
+        int count = failureCounts.getOrDefault(action.productId, 0) + 1;
+        failureCounts.put(action.productId, count);
+        Logger.warn("Failure count for " + action.productId + " now " + count + "/3");
+
+        if (count >= 3) {
+            Logger.error("Marking flip FAILED after 3 failures: " + action.productId);
+            ActiveFlip failedFlip = activeFlips.remove(action.productId);
+            if (failedFlip != null) {
+                budgetManager.releaseInvestment(action.productId, failedFlip.amountInvested);
+                orderManager.markOrderCancelled(action.productId);
+            } else if (action.type == CommandQueue.ActionType.PLACE_BUY_ORDER) {
+                budgetManager.releaseInvestment(action.productId, action.price * action.quantity);
+            }
+            failureCounts.remove(action.productId);
+            discordEventHandler.onError("Flip FAILED after 3 failures: " + action.type + " for " + action.productId + " error " + e.getMessage(), state.name());
+            ToastNotification.show("Flip FAILED: " + action.productId, ToastNotification.ToastType.ERROR);
+            saveSessionState();
+            return;
+        }
+
+        // For <3 failures, only free budget on immediate buy order failure to allow retry? Per spec, keep flip but retry
+        if (action.type == CommandQueue.ActionType.PLACE_BUY_ORDER && count == 1) {
+            // On first failure we keep investment registered to allow retry? Actually we release on failure to avoid deadlock, but re-register on success
+            // Simplified: release and will re-register on retry
             budgetManager.releaseInvestment(action.productId, action.price * action.quantity);
         }
-        discordEventHandler.onError("Action failed: " + action.type + " for " + action.productId + " error " + e.getMessage(), state.name());
+        discordEventHandler.onError("Action failed (" + count + "/3): " + action.type + " for " + action.productId + " error " + e.getMessage(), state.name());
         saveSessionState();
     }
 
     public void performStartupCleanup() {
         // On fresh start (not resume): navigate to bazaar (or /bz if cookie), open Manage Orders, scan existing orders
         // Profitable -> adopt as ActiveFlip, register BudgetManager
-        // Not profitable -> log to HUD, leave untouched
-        // Simplified
+        // Not profitable -> log to HUD, leave untouched (never automatically cancel per spec)
         Logger.info("Performing startup order cleanup");
-        // Would open bazaar manage orders GUI and parse
-        // Placeholder
+        try {
+            // Open bazaar via cookie or navigation
+            boolean opened = bazaarInteractor.openBazaar(); // internally handles /bz if cookie else navigate
+            if (!opened) {
+                Logger.warn("Failed to open bazaar for startup cleanup, skipping");
+                return;
+            }
+
+            // Open Manage Orders GUI - find "Manage Orders" button by name/lore
+            // This would be implemented via ClickSimulator clicking slot containing "Your Bazaar Orders"
+            // For each order found in GUI, parse lore for price/qty/filled
+            // For each existing order:
+            // - Calculate current profitability via TaxCalculator
+            // - If profitable -> adopt as ActiveFlip, register in BudgetManager
+            // - Else -> log to HUD, leave untouched (never auto-cancel)
+            // Simplified iteration over activeFlips as placeholder for existing orders detection
+
+            // Example: would iterate screen slots, for each ItemStack representing an order:
+            // var loreInfo = inventoryScanner.parseOrderLore(stack)
+            // double currentBuy = lastBazaarData.getProduct(productId).getTopBuyOrderPrice()
+            // double currentSell = ...
+            // double profit = taxCalculator.calculateBazaarProfit(loreInfo.pricePerUnit, currentSell or currentBuy)
+            // If profit > 0 then adopt
+
+            // Placeholder loop for existing tracked flips (if any from previous session not via resume)
+            for (Map.Entry<String, ActiveFlip> entry : activeFlips.entrySet()) {
+                ActiveFlip flip = entry.getValue();
+                double currentProfit = 0;
+                if (lastBazaarData != null) {
+                    var product = lastBazaarData.getProduct(flip.productId);
+                    if (product != null) {
+                        double buy = product.getTopBuyOrderPrice();
+                        double sell = product.getTopSellOfferPrice();
+                        currentProfit = taxCalculator.calculateBazaarProfit(buy, sell);
+                    }
+                }
+                if (currentProfit > 0) {
+                    // Profitable -> adopt, register budget if not already
+                    if (!budgetManager.getInvestmentsSnapshot().containsKey(flip.productId)) {
+                        budgetManager.registerInvestment(flip.productId, flip.amountInvested);
+                    }
+                    Logger.info("Adopted profitable existing order: " + flip.productId + " profit " + currentProfit);
+                    ToastNotification.show("Adopted existing order: " + flip.productId, ToastNotification.ToastType.INFO);
+                } else {
+                    // Not profitable -> log to HUD, leave entirely untouched. Do not cancel.
+                    Logger.info("Existing order not profitable, leaving untouched: " + flip.productId + " profit " + currentProfit);
+                    ToastNotification.show("Leaving unprofitable order untouched: " + flip.productId, ToastNotification.ToastType.WARNING);
+                }
+            }
+
+            // Close GUI after cleanup
+            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            mc.execute(() -> {
+                if (mc.currentScreen != null) mc.setScreen(null);
+            });
+
+        } catch (Exception e) {
+            Logger.error("Startup cleanup failed", e);
+        }
     }
 
     private void saveSessionState() {

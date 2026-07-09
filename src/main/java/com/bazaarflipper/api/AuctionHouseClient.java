@@ -124,23 +124,66 @@ public class AuctionHouseClient {
     }
 
     private String extractBaseItemId(JsonObject auctionObj) {
-        // Try to get item_id from item_lore or item_name
-        // AH items have modifiers in display name, but base ID can be parsed from lore or from extra attributes
-        // Simplified: Use auction's item_name field if available, fallback to tag
+        // Spec: Name matching by base item ID from lore (not display name — AH items have modifiers)
+        // AH items have modifiers in display name like "Strong Dragon Boots" but base ID from lore
         try {
-            if (auctionObj.has("item_name")) {
-                String name = auctionObj.get("item_name").getAsString();
-                // Heuristic: use uppercased with underscores for bazaar-like id? Real impl should parse nbt
-                // For now, attempt to get from "item_lore" or use name cleaned
-                // We'll try to parse from lore if contains id pattern
+            // First try lore parsing: look for item_lore field
+            if (auctionObj.has("item_lore")) {
+                JsonElement loreEl = auctionObj.get("item_lore");
+                String loreText = "";
+                if (loreEl.isJsonArray()) {
+                    // Join lore lines
+                    StringBuilder sb = new StringBuilder();
+                    for (JsonElement lineEl : loreEl.getAsJsonArray()) {
+                        sb.append(lineEl.getAsString()).append("\n");
+                    }
+                    loreText = sb.toString();
+                } else if (loreEl.isJsonPrimitive()) {
+                    loreText = loreEl.getAsString();
+                }
+
+                // Strip color codes §
+                String stripped = loreText.replaceAll("§.", "");
+
+                // Parse for base ID pattern: lines that look like pure ID (A-Z_ uppercase, maybe numbers) and length > 3
+                // Also look for common patterns like "ID: ENCHANTED_DIAMOND" or just ID in lore footer
+                for (String line : stripped.split("\n")) {
+                    String trimmed = line.trim();
+                    // Remove rarity prefixes? Try to find ID candidate
+                    // If line matches [A-Z0-9_]+ and contains underscore or is known item pattern
+                    if (trimmed.matches("^[A-Z0-9_]+$") && trimmed.length() > 3) {
+                        // Candidate base ID
+                        if (!trimmed.equals("COMMON") && !trimmed.equals("RARE") && !trimmed.equals("EPIC") && !trimmed.equals("LEGENDARY") && !trimmed.equals("MYTHIC")) {
+                            return trimmed;
+                        }
+                    }
+                    // Also check for "ID: XXX" pattern
+                    if (trimmed.toUpperCase().contains("ID:")) {
+                        String after = trimmed.toUpperCase().split("ID:")[1].trim().replaceAll("[^A-Z0-9_]", "");
+                        if (!after.isEmpty()) return after;
+                    }
+                    // Check for item tag like "SUPER_COMPACTOR_3000" inside lore text even with spaces? Convert spaces to underscores
+                    // Heuristic: if line contains "Super Compactor" we convert to SUPER_COMPACTOR_3000 fallback later
+                }
+
+                // Fallback: if lore contains known item keywords, map to bazaar ID via heuristic conversion
+                // For AH craft flip items like Super Compactor 3000, its display name is exact, so use display name as fallback below
             }
-            // Check for "tier" and "item_name" not reliable
-            // Alternative: Look into "extra" -> but API may not expose nbt directly in this endpoint? In v2 it does via item_bytes? Let's use a placeholder fallback
-            // Actually auction has "item_name" like "Enchanted Diamond" - convert to "ENCHANTED_DIAMOND"
+
+            // Fallback to display name conversion but note it's not ideal per spec — use as secondary
             if (auctionObj.has("item_name")) {
                 String raw = auctionObj.get("item_name").getAsString();
-                // Very rough conversion
-                return raw.toUpperCase(Locale.ROOT).replace(' ', '_').replaceAll("[^A-Z0-9_]", "");
+                // Remove reforge prefixes like "Strong", "Wise", "Unpleasant" - list of known reforges
+                String[] reforges = {"Strong", "Wise", "Unpleasant", "Gentle", "Odd", "Fast", "Fair", "Epic", "Sharp", "Heroic", "Spicy", "Legendary", "Deadly", "Fine", "Grand", "Hasty", "Neat", "Rapid", "Unreal", "Awkward", "Rich", "Precise", "Spiritual", "Headstrong"};
+                String cleaned = raw;
+                for (String reforge : reforges) {
+                    if (cleaned.startsWith(reforge + " ")) {
+                        cleaned = cleaned.substring(reforge.length()+1);
+                        break;
+                    }
+                }
+                // Now convert to ID: upper, spaces to underscores, remove non-alphanumeric
+                return cleaned.toUpperCase(java.util.Locale.ROOT).replace(' ', '_').replaceAll("[^A-Z0-9_]", "");
             }
         } catch (Exception e) {
             return null;
