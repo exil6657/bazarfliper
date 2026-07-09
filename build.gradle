@@ -13,11 +13,12 @@ repositories {
 }
 
 loom {
-    splitEnvironmentSourceSets()
+    // This is a client-only mod and the existing source tree lives under src/main.
+    // Do not split environment source sets here, otherwise src/main compiles against
+    // common Minecraft only and cannot see net.minecraft.client.* classes.
     mods {
         "bazaarflipper" {
             sourceSet sourceSets.main
-            sourceSet sourceSets.client
         }
     }
 }
