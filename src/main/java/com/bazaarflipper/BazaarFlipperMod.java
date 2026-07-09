@@ -15,6 +15,8 @@ import com.bazaarflipper.discord.DiscordWebhookClient;
 import com.bazaarflipper.engine.*;
 import com.bazaarflipper.mayor.*;
 import com.bazaarflipper.pathfinding.*;
+import com.bazaarflipper.security.LockConfig;
+import com.bazaarflipper.security.LockManager;
 import com.bazaarflipper.tracker.HistoryManager;
 import com.bazaarflipper.tracker.ProfitTracker;
 import com.bazaarflipper.ui.ActiveFlipsWidget;
@@ -52,6 +54,7 @@ public class BazaarFlipperMod implements ClientModInitializer {
     private NPCConfig npcConfig;
     private PlayerCapabilityConfig playerCapabilityConfig;
     private FilterConfig filterConfig;
+    private LockConfig lockConfig;
 
     // Data
     private ItemDatabase itemDatabase;
@@ -118,6 +121,9 @@ public class BazaarFlipperMod implements ClientModInitializer {
     private DiscordMessageFormatter discordFormatter;
     private DiscordEventHandler discordEventHandler;
 
+    // Security - private locking PIN
+    private LockManager lockManager;
+
     // UI
     private HudOverlay hudOverlay;
     private ActiveFlipsWidget activeFlipsWidget;
@@ -147,6 +153,7 @@ public class BazaarFlipperMod implements ClientModInitializer {
         // 4. Load PlayerCapabilityConfig
         playerCapabilityConfig = PlayerCapabilityConfig.load();
         filterConfig = FilterConfig.load();
+        lockConfig = LockConfig.load();
 
         // Data layer
         itemDatabase = new ItemDatabase();
@@ -214,6 +221,10 @@ public class BazaarFlipperMod implements ClientModInitializer {
         botClient = new DiscordBotClient(modConfig.botToken, modConfig.commandChannelId);
         discordFormatter = new DiscordMessageFormatter(modConfig);
         discordEventHandler = new DiscordEventHandler(modConfig, webhookClient, botClient, discordFormatter);
+
+        // Security - private locking PIN (credits Cldz) - portion saved in config/bazaarflipper_lock.json hashed
+        lockManager = new LockManager(lockConfig, modConfig, discordEventHandler);
+        lockManager.onGameStart(); // will lock on startup if PIN set, requiring unlock via Dashboard > Security
 
         // Now watchdog with discord
         guiWatchdog = new GuiWatchdog(discordEventHandler);
@@ -525,6 +536,7 @@ public class BazaarFlipperMod implements ClientModInitializer {
         saveAllConfigs();
         waypointRegistry.saveCustomWaypoints();
         itemDatabase.save();
+        if (lockManager != null) lockManager.onDisconnect();
         if (!worldStateRecovery.isLimboCooldownActive()) {
             reconnectManager.onDisconnect();
         }
@@ -537,9 +549,10 @@ public class BazaarFlipperMod implements ClientModInitializer {
             npcConfig.save();
             playerCapabilityConfig.save();
             filterConfig.save();
+            lockConfig.save();
             waypointRegistry.saveCustomWaypoints();
             itemDatabase.save();
-            Logger.info("All configs saved (bazaarflipper.json, budget, npc, player, filters, waypoints, items) - persists across restarts");
+            Logger.info("All configs saved (bazaarflipper.json, budget, npc, player, filters, lock, waypoints, items) - persists across restarts, credits Cldz");
         } catch (Exception e) {
             Logger.error("Failed to save all configs on shutdown", e);
         }
@@ -572,6 +585,15 @@ public class BazaarFlipperMod implements ClientModInitializer {
     }
 
     private void toggleFlipper() {
+        // Private locking PIN check - only authorized people can use mod
+        if (lockManager != null && lockManager.isLocked()) {
+            ToastNotification.show(lockManager.getLockMessage(), ToastNotification.ToastType.ERROR);
+            Logger.warn("Attempt to toggle flipper while locked - PIN required, credits Cldz");
+            // Open dashboard to security tab automatically? For now just toast and open dashboard
+            openDashboard();
+            return;
+        }
+
         if (flipEngine.isRunning()) {
             // On toggle OFF: save state, stop engine, end break scheduler, notify Discord
             sessionStateManager.saveState();
@@ -658,4 +680,7 @@ public class BazaarFlipperMod implements ClientModInitializer {
     public ModConfig getModConfig() { return modConfig; }
     public BudgetConfig getBudgetConfig() { return budgetConfig; }
     public FilterConfig getFilterConfig() { return filterConfig; }
+    public LockConfig getLockConfig() { return lockConfig; }
+    public LockManager getLockManager() { return lockManager; }
+    public FlipEngine getFlipEngine() { return flipEngine; }
 }

@@ -5,8 +5,11 @@ import com.bazaarflipper.data.TaxCalculator;
 import com.bazaarflipper.engine.*;
 import com.bazaarflipper.mayor.MayorData;
 import com.bazaarflipper.mayor.MayorTracker;
+import com.bazaarflipper.security.LockConfig;
+import com.bazaarflipper.security.LockManager;
 import com.bazaarflipper.tracker.HistoryManager;
 import com.bazaarflipper.tracker.ProfitTracker;
+import com.bazaarflipper.ui.widgets.CustomTextField;
 import com.bazaarflipper.util.ColorUtils;
 import com.bazaarflipper.util.MathUtils;
 import net.minecraft.client.MinecraftClient;
@@ -39,6 +42,13 @@ public class DashboardScreen extends Screen {
     private final ProfitGraphWidget profitGraphWidget = new ProfitGraphWidget();
     private boolean advancedTaxExpanded = false;
 
+    // Security PIN widgets
+    private final CustomTextField pinInputField = new CustomTextField(0,0,150,20,"Enter PIN");
+    private final CustomTextField newPinField = new CustomTextField(0,0,150,20,"New PIN (4-32)");
+    private final CustomTextField confirmPinField = new CustomTextField(0,0,150,20,"Confirm New PIN");
+    private final CustomTextField oldPinField = new CustomTextField(0,0,150,20,"Old PIN (if set)");
+    private final CustomTextField hintField = new CustomTextField(0,0,200,20,"Hint (optional)");
+
     private enum Tab {
         OVERVIEW("Overview"),
         ACTIVE_ORDERS("Active Orders"),
@@ -49,7 +59,8 @@ public class DashboardScreen extends Screen {
         SETTINGS("Settings"),
         FILTERS("Filters"),
         DISCORD("Discord"),
-        NPC_CONFIG("NPC Config");
+        NPC_CONFIG("NPC Config"),
+        SECURITY("Security");
 
         final String display;
         Tab(String d) { display = d; }
@@ -205,6 +216,7 @@ public class DashboardScreen extends Screen {
             case FILTERS -> renderFiltersTab(context, contentX, contentY, contentW, contentH, mouseX, mouseY);
             case DISCORD -> renderDiscordTab(context, contentX, contentY, contentW, contentH, mouseX, mouseY);
             case NPC_CONFIG -> renderNpcTab(context, contentX, contentY, contentW, contentH, mouseX, mouseY);
+            case SECURITY -> renderSecurityTab(context, contentX, contentY, contentW, contentH, mouseX, mouseY);
         }
 
         // Render buttons (for hover effect need mouse pos)
@@ -703,8 +715,141 @@ public class DashboardScreen extends Screen {
         ctx.drawText(textRenderer, "Credits: Cldz — All custom coordinates can be overridden; use Auto-Nearest toggle for automatic nearest NPC selection", x+5, noteY, ColorUtils.TITLE_TEXT, false);
     }
 
+    private void renderSecurityTab(DrawContext ctx, int x, int y, int w, int h, int mouseX, int mouseY) {
+        // Security Tab - Private locking PIN so only authorized people can use mod
+        // PIN saved hashed in config/bazaarflipper_lock.json, persists across restarts, credits Cldz
+        com.bazaarflipper.security.LockManager lockManager = com.bazaarflipper.BazaarFlipperMod.getInstance().getLockManager();
+        com.bazaarflipper.security.LockConfig lockConfig = com.bazaarflipper.BazaarFlipperMod.getInstance().getLockConfig();
+
+        int curY = y+5;
+        ctx.drawText(textRenderer, "Security - Private Locking PIN (Only authorized users can use mod) - Credits: Cldz", x+5, curY, ColorUtils.TITLE_TEXT, false);
+        curY+=12;
+        ctx.drawText(textRenderer, "PIN is hashed with salt and saved in config/bazaarflipper_lock.json (never plaintext) - persists across restarts", x+5, curY, ColorUtils.SECONDARY_TEXT, false);
+        curY+=15;
+
+        boolean locked = lockManager.isLocked();
+        boolean lockout = lockManager.isLockoutActive();
+
+        int statusColor = locked ? ColorUtils.PROFIT_NEGATIVE : ColorUtils.PROFIT_POSITIVE;
+        String statusText = locked ? "LOCKED - Requires PIN" : "UNLOCKED - Authorized";
+        if (lockout) statusText = "LOCKOUT ACTIVE - Too many failed attempts";
+        ctx.fill(x+5, curY, x+w-10, curY+20, ColorUtils.PANEL_INNER);
+        ctx.drawText(textRenderer, "Status: " + statusText, x+10, curY+5, statusColor, false);
+        curY+=25;
+
+        if (lockout) {
+            long remaining = lockConfig.getLockoutRemaining() / 1000;
+            ctx.drawText(textRenderer, "Lockout remaining: " + remaining + "s - Failed attempts: " + lockConfig.failedAttempts + "/" + lockConfig.maxAttempts, x+5, curY, ColorUtils.WARNING, false);
+            curY+=15;
+        }
+
+        ctx.drawText(textRenderer, "Lock Enabled: " + lockConfig.lockEnabled + " | Has PIN: " + (lockConfig.pinHash != null && !lockConfig.pinHash.isEmpty()) + " | Created: " + (lockConfig.pinCreatedAt>0 ? new java.util.Date(lockConfig.pinCreatedAt).toString() : "Never"), x+5, curY, ColorUtils.SECONDARY_TEXT, false);
+        curY+=15;
+
+        // PIN input fields positioning
+        pinInputField.x = x+5;
+        pinInputField.y = curY;
+        pinInputField.width = 150;
+        pinInputField.height = 18;
+        pinInputField.placeholder = "Enter PIN to unlock";
+        pinInputField.render(ctx, mouseX, mouseY);
+        curY+=22;
+
+        Button unlockBtn = new Button(x+160, pinInputField.y, 80, 18, "Unlock", () -> {
+            String pin = pinInputField.getText();
+            if (pin != null && !pin.isEmpty()) {
+                lockManager.unlock(pin);
+                pinInputField.setText("");
+            }
+        });
+        unlockBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(unlockBtn);
+
+        Button lockBtn = new Button(x+245, pinInputField.y, 60, 18, "Lock", () -> lockManager.lock());
+        lockBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(lockBtn);
+
+        curY+=10;
+        ctx.drawText(textRenderer, "--- Set / Change PIN ---", x+5, curY, ColorUtils.TITLE_TEXT, false);
+        curY+=12;
+
+        oldPinField.x = x+5; oldPinField.y = curY; oldPinField.width = 150; oldPinField.height = 18;
+        oldPinField.placeholder = "Old PIN (if set)";
+        oldPinField.render(ctx, mouseX, mouseY);
+        curY+=22;
+
+        newPinField.x = x+5; newPinField.y = curY;
+        newPinField.render(ctx, mouseX, mouseY);
+        curY+=22;
+
+        confirmPinField.x = x+5; confirmPinField.y = curY;
+        confirmPinField.render(ctx, mouseX, mouseY);
+        curY+=22;
+
+        hintField.x = x+5; hintField.y = curY; hintField.width = 200;
+        hintField.placeholder = "Hint (optional, e.g. birthday)";
+        hintField.render(ctx, mouseX, mouseY);
+        curY+=22;
+
+        Button setPinBtn = new Button(x+5, curY, 140, 18, "Set New PIN", () -> {
+            String oldPin = oldPinField.getText();
+            String newPin = newPinField.getText();
+            String confirm = confirmPinField.getText();
+            String hint = hintField.getText();
+            if (newPin == null || newPin.isEmpty()) return;
+            if (!newPin.equals(confirm)) {
+                com.bazaarflipper.ui.ToastNotification.show("PINs do not match", com.bazaarflipper.ui.ToastNotification.ToastType.ERROR);
+                return;
+            }
+            if (newPin.length() < 4) {
+                com.bazaarflipper.ui.ToastNotification.show("PIN too short min 4", com.bazaarflipper.ui.ToastNotification.ToastType.ERROR);
+                return;
+            }
+            boolean ok = lockManager.setNewPin(newPin, oldPin.isEmpty() ? null : oldPin);
+            if (ok) {
+                lockConfig.pinHint = hint != null ? hint : "";
+                lockConfig.save();
+                oldPinField.setText("");
+                newPinField.setText("");
+                confirmPinField.setText("");
+                hintField.setText("");
+            }
+        });
+        setPinBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(setPinBtn);
+
+        Button disableBtn = new Button(x+150, curY, 120, 18, "Disable Lock", () -> {
+            String pin = oldPinField.getText();
+            if (pin == null || pin.isEmpty()) pin = pinInputField.getText();
+            lockManager.disableLock(pin);
+        });
+        disableBtn.normalColor = 0xFF4A1A1A;
+        disableBtn.render(ctx, MinecraftClient.getInstance(), mouseX, mouseY);
+        currentButtons.add(disableBtn);
+
+        curY+=25;
+        ctx.drawText(textRenderer, "Security Details:", x+5, curY, ColorUtils.TITLE_TEXT, false);
+        curY+=12;
+        ctx.drawText(textRenderer, "- PIN hashed with SHA-256 + random 16-byte salt, Base64 stored, never plaintext", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=10;
+        ctx.drawText(textRenderer, "- Config file: config/bazaarflipper_lock.json - persists across game restarts", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=10;
+        ctx.drawText(textRenderer, "- Lockout after " + lockConfig.maxAttempts + " failed attempts for " + (lockConfig.lockoutDurationMs/1000/60) + " minutes", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=10;
+        ctx.drawText(textRenderer, "- When locked, flip engine cannot start, HUD shows locked warning", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=10;
+        ctx.drawText(textRenderer, "- Requires PIN on every game start if lock enabled (for security)", x+10, curY, ColorUtils.SECONDARY_TEXT, false); curY+=10;
+        ctx.drawText(textRenderer, "- Hint: " + (lockConfig.pinHint != null && !lockConfig.pinHint.isEmpty() ? lockConfig.pinHint : "No hint set"), x+10, curY, ColorUtils.WARNING, false); curY+=15;
+        ctx.drawText(textRenderer, "What do you need for auth system? Consider:", x+5, curY, ColorUtils.TITLE_TEXT, false); curY+=12;
+        ctx.drawText(textRenderer, "1. Per-user whitelist (UUIDs) so friends can use without PIN? 2. Discord OAuth? 3. Time-based one-time PIN? 4. Hardware ID lock? Tell me in chat!", x+10, curY, ColorUtils.SECONDARY_TEXT, false);
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // Security tab text fields focus handling
+        if (activeTab == Tab.SECURITY) {
+            pinInputField.mouseClicked(mouseX, mouseY);
+            oldPinField.mouseClicked(mouseX, mouseY);
+            newPinField.mouseClicked(mouseX, mouseY);
+            confirmPinField.mouseClicked(mouseX, mouseY);
+            hintField.mouseClicked(mouseX, mouseY);
+        }
         for (Button b : currentButtons) {
             if (b.isMouseOver(mouseX, mouseY)) {
                 b.click();
@@ -712,6 +857,40 @@ public class DashboardScreen extends Screen {
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean charTyped(char chr, int modifiers) {
+        if (activeTab == Tab.SECURITY) {
+            pinInputField.charTyped(chr);
+            oldPinField.charTyped(chr);
+            newPinField.charTyped(chr);
+            confirmPinField.charTyped(chr);
+            hintField.charTyped(chr);
+            return true;
+        }
+        return super.charTyped(chr, modifiers);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (activeTab == Tab.SECURITY) {
+            pinInputField.keyPressed(keyCode);
+            oldPinField.keyPressed(keyCode);
+            newPinField.keyPressed(keyCode);
+            confirmPinField.keyPressed(keyCode);
+            hintField.keyPressed(keyCode);
+            if (keyCode == 257 || keyCode == 335) { // Enter
+                // Try unlock if pinInput focused
+                if (pinInputField.focused) {
+                    var lockManager = com.bazaarflipper.BazaarFlipperMod.getInstance().getLockManager();
+                    if (lockManager != null) lockManager.unlock(pinInputField.getText());
+                    return true;
+                }
+            }
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
