@@ -1,0 +1,8 @@
+{
+  "skyblock_epoch_start": 1560275700,
+  "election_interval_days": 5,
+  "election_real_duration_hours": 24,
+  "mayor_term_days": 5,
+  "notes": "Skyblock year 0 day 0 corresponds to unix timestamp 1560275700. Election happens every ~5 skyblock years mapped to real time. Real-time mayor term ~5 days after better mayors update. Values researched from wiki - verify for 26.1.2.",
+  "known_election_schedule": []
+}
