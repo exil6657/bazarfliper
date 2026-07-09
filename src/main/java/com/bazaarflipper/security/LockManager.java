@@ -100,19 +100,29 @@ public class LockManager {
         ToastNotification.show("Lock disabled - mod open", ToastNotification.ToastType.INFO);
     }
 
-    // Called on game start - if lock enabled and PIN set, require unlock
+    // Called on game start - policy: stay unlocked until manually locked (convenient) per user preference
+    // User selected "stay_unlocked" over "every_restart" in ask_user
     public void onGameStart() {
         if (lockConfig.lockEnabled && lockConfig.pinHash != null && !lockConfig.pinHash.isEmpty()) {
-            lockConfig.isUnlocked = false; // require PIN each restart for security
-            Logger.info("Lock enabled - mod locked on startup, requires PIN to unlock. Credits: Cldz");
+            // User preference: stay unlocked until manually locked (convenient PIN-only)
+            // So we do NOT lock on startup, we stay unlocked. Only if user explicitly pressed Lock button will it require PIN.
+            lockConfig.isUnlocked = true;
+            lockConfig.unlockedAt = System.currentTimeMillis();
+            Logger.info("Lock enabled (PIN-only, stay-unlocked-till-manual-lock per user pref) - mod stays unlocked until manually locked via Security tab. Credits: Cldz");
+            // Optional toast for info but not warning, since convenient mode
             MinecraftClient mc = MinecraftClient.getInstance();
             if (mc != null) {
                 mc.execute(() -> {
-                    ToastNotification.show("Mod locked - enter PIN in Dashboard > Security. Credits: Cldz", ToastNotification.ToastType.WARNING);
+                    ToastNotification.show("Security: PIN lock enabled (stay unlocked till manual lock) - Credits: Cldz", ToastNotification.ToastType.INFO);
                 });
             }
         } else {
             lockConfig.isUnlocked = true; // no lock
+            if (!lockConfig.lockEnabled) {
+                Logger.info("Lock disabled - mod open, PIN-only auth not active");
+            } else {
+                Logger.info("No PIN set yet - first time setup, mod open until PIN set. Go to Dashboard > Security to set PIN. Credits: Cldz");
+            }
         }
     }
 
